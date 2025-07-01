@@ -10,8 +10,7 @@ use clap::error;
 
 use crate::{
     DIR_PATH, io_service as io,
-    object_service::{self, Kind, Object, ObjectDescriptor},
-    store::{self},
+    object_service::{self, Key255, Kind, Object, ObjectDescriptor},
 };
 
 pub struct Core {
@@ -59,94 +58,43 @@ impl Core {
         match self.objects.objects_map.get(key) {
             Some(value) => {
                 let data = value.data.clone();
+                println!("data: {:?}", value);
                 Some(data)
             }
             None => None,
         }
     }
-    pub fn set(&mut self, key: &str, data: Vec<u8>) {
+    pub fn set(&mut self, key: &str, kind: Kind, data: Vec<u8>) {
         let size = data.len();
 
-        let mut file_ref = self.data_file.borrow_mut();
+        let file_ref = self.data_file.borrow_mut();
         let offset = io::save_object_in_file(&data, file_ref).unwrap() as usize;
-        let mut desc_file_ref = self.desc_file.borrow_mut();
+        let desc_file_ref = self.desc_file.borrow_mut();
         let desc = ObjectDescriptor {
-            key: key.to_string(),
-            kind: Kind::String,
+            key: Key255::new(key),
+            kind: kind.clone(),
             offset: offset as u64,
             size: size as u64,
         };
-        let desc_data = bincode::serialize(&desc).unwrap();
-        io::save_desc_in_file(&desc_data, desc_file_ref);
 
-        let obj = Object { desc: desc, data };
+        let desc_data = bincode::serialize(&desc).unwrap();
+        println!("data: {:?}", data);
+        match io::save_desc_in_file(&desc_data, desc_file_ref) {
+            Err(e) => panic!("{}", e),
+
+            _ => {
+                println!("set an object")
+            }
+        }
+        let obj = Object {
+            desc: ObjectDescriptor {
+                key: Key255::new(key),
+                kind: kind,
+                offset: offset as u64,
+                size: size as u64,
+            },
+            data,
+        };
         self.objects.objects_map.insert(key.to_string(), obj);
     }
 }
-// use std::fs;
-
-// use crate::{
-//     DIR_PATH,
-//     groups::{self, ObjectStore},
-//     io_service,
-//     objects::{Kind, Object_descriptor},
-// };
-
-// pub struct Core {
-//     pub store: groups::ObjectStore,
-//     io: io_service::IoService,
-// }
-// impl Core {
-//     pub fn new() -> Core {
-//         let mut core = Core {
-//             store: groups::ObjectStore::new(),
-//             io: io_service::IoService::new(),
-//         };
-//         fs::create_dir_all(DIR_PATH).expect("Nie udało się utworzyć katalogu danych");
-//         core.store.init().unwrap();
-//         return core;
-//     }
-//     pub fn get_object_by_key_and_group(
-//         &self,
-//         group_name: &str,
-//         key: &str,
-//     ) -> Result<Option<&Object_descriptor>, Box<dyn std::error::Error>> {
-//         let group = self.store.get_group(group_name).unwrap();
-
-//         let object = group.get_object_descriptor_by_key(key);
-
-//         object
-//     }
-//     pub fn get_object_by_key(&self, key: &str) -> Option<&Object_descriptor> {
-//         for group in self.store.groups.iter() {
-//             if let Some(obj) = group.1.table_map.get(key) {
-//                 return Some(obj);
-//             }
-//         }
-//         None
-//     }
-//     pub fn add(&mut self, key: &str, data: Vec<u8>) {
-//         let default_group = self.store.groups.get_mut("default").unwrap();
-//         let size = data.len();
-//         let mut obj = Object_descriptor {
-//             data,
-//             created_at: 1_656_000_000_000,
-//             updated_at: 1_656_100_000_000,
-//             last_opened_at: 1_656_200_000_000,
-//             next_offset: 1024,
-//             kind: Kind::String,
-//             offset: 100,
-//             size,
-//             key: key.to_string(),
-//             is_mem_storage: false,
-//             header: [0u8; 16],
-//             columns: vec![0, 1, 2],
-//             free_bytes: 10,
-//         };
-//         let obj_cpy = obj.clone();
-//         let file_ref = default_group.data_file.borrow_mut();
-//         let offset = self.io.save_object_on_disk(&obj_cpy, file_ref).unwrap();
-//         obj.offset = offset;
-//         default_group.table_map.insert(key.to_string(), obj);
-//     }
-// }

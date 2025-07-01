@@ -4,7 +4,8 @@ use std::{cell::RefMut, collections::HashMap, fs::File, process, str::FromStr, s
 
 use serde::{Deserialize, Serialize};
 
-use crate::{io_service, store};
+use crate::io_service;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Kind {
     Number,
@@ -61,15 +62,50 @@ impl Kind {
         }
     }
 }
-#[derive(Serialize, Deserialize)]
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Key255 {
+    pub bytes: Vec<u8>,
+}
+
+impl Key255 {
+    pub fn new(data: &str) -> Self {
+        let bytes = data.as_bytes();
+        let mut vec = Vec::with_capacity(255);
+
+        if bytes.len() >= 255 {
+            vec.extend_from_slice(&bytes[..255]);
+        } else {
+            vec.extend_from_slice(bytes);
+            vec.resize(255, 0);
+        }
+
+        Key255 { bytes: vec }
+    }
+
+    pub fn len(&self) -> usize {
+        self.bytes.len()
+    }
+
+    pub fn to_string(&self) -> String {
+        let trimmed = self
+            .bytes
+            .iter()
+            .take_while(|&&b| b != 0)
+            .map(|&b| b as char)
+            .collect();
+        trimmed
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ObjectDescriptor {
-    pub key: String,
+    pub key: Key255,
     pub kind: Kind,
     pub offset: u64,
     pub size: u64,
 }
-
+#[derive(Debug)]
 pub struct Object {
     pub desc: ObjectDescriptor,
     pub data: Vec<u8>,
@@ -85,36 +121,33 @@ impl ObjectService {
         }
     }
     pub fn load_objects_desc(&mut self, mut file: RefMut<File>) {
-        const RECORD_SIZE: usize = 255 + 8 + 8 + 1;
+        const RECORD_SIZE: usize = 283;
         let mut buffer = vec![0u8; RECORD_SIZE];
+        let meta = file.metadata();
+        println!("{:?}", meta);
 
         while let Ok(_) = file.read_exact(&mut buffer) {
-            let raw_key = &buffer[..255];
-            let key = match std::str::from_utf8(raw_key) {
-                Ok(key) => key.trim_end_matches(char::from(0)).to_string(),
-                Err(_) => continue,
-            };
-            let kind = Kind::from_u8(buffer[255]);
-
-            let offset = u64::from_le_bytes(buffer[256..264].try_into().unwrap());
-            let size = u64::from_le_bytes(buffer[264..272].try_into().unwrap());
-
-            let key_copy = key.clone();
-            let object_descriptor = ObjectDescriptor {
-                key,
-                kind,
-                offset,
-                size,
-            };
-            let object = Object {
-                desc: object_descriptor,
-                data: vec![],
-            };
-            self.objects_map.insert(key_copy, object);
+            match bincode::deserialize::<ObjectDescriptor>(&buffer) {
+                Ok(object_descriptor) => {
+                    let key_copy = object_descriptor.key.to_string();
+                    let object = Object {
+                        desc: object_descriptor,
+                        data: vec![],
+                    };
+                    self.objects_map.insert(key_copy, object);
+                }
+                Err(e) => {
+                    println!("Failed to deserialize record: {:?}", e);
+                    continue;
+                }
+            }
         }
+        println!("Loaded object descriptions");
     }
 
     pub fn load_objects_data(&mut self, mut file: RefMut<File>) {
+        println!("Loaded object data");
+
         for object in self.objects_map.values_mut() {
             let data =
                 io_service::read_object_from_file(&mut file, object.desc.offset, object.desc.size);

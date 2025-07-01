@@ -12,13 +12,13 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Commands {
-    AddObject {
+    Add {
         key: String,
         data: String,
         kind: String,
     },
 
-    GetObject {
+    Get {
         key: String,
     },
 }
