@@ -1,10 +1,11 @@
 use core::fmt;
-use std::{collections::HashMap, process, str::FromStr, sync::Arc};
+use std::io::{Read, Seek, SeekFrom, Write};
+use std::{cell::RefMut, collections::HashMap, fs::File, process, str::FromStr, sync::Arc};
 
-use rusqlite::ffi::Error;
+use serde::{Deserialize, Serialize};
 
-use crate::store;
-#[derive(Debug, Clone)]
+use crate::{io_service, store};
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Kind {
     Number,
     Boolean,
@@ -60,44 +61,65 @@ impl Kind {
         }
     }
 }
+#[derive(Serialize, Deserialize)]
+
+pub struct ObjectDescriptor {
+    pub key: String,
+    pub kind: Kind,
+    pub offset: u64,
+    pub size: u64,
+}
 
 pub struct Object {
-    pub kind: Kind,
-    pub offset: usize,
-    pub size: usize,
+    pub desc: ObjectDescriptor,
+    pub data: Vec<u8>,
 }
 pub struct ObjectService {
-    store: Arc<store::StoreDb>,
     pub objects_map: HashMap<String, Object>,
 }
 
 impl ObjectService {
-    pub fn new(store: Arc<store::StoreDb>) -> ObjectService {
+    pub fn new() -> ObjectService {
         ObjectService {
-            store,
             objects_map: HashMap::new(),
         }
     }
-    pub fn load_objects(&mut self) {
-        match self.store.read_all() {
-            Ok(objects) => {
-                for obj_desc in objects.iter() {
-                    let key = obj_desc.key.clone();
+    pub fn load_objects_desc(&mut self, mut file: RefMut<File>) {
+        const RECORD_SIZE: usize = 255 + 8 + 8 + 1;
+        let mut buffer = vec![0u8; RECORD_SIZE];
 
-                    let object = Object {
-                        kind: obj_desc.kind.clone(),
-                        offset: obj_desc.offset,
-                        size: obj_desc.size,
-                    };
+        while let Ok(_) = file.read_exact(&mut buffer) {
+            let raw_key = &buffer[..255];
+            let key = match std::str::from_utf8(raw_key) {
+                Ok(key) => key.trim_end_matches(char::from(0)).to_string(),
+                Err(_) => continue,
+            };
+            let kind = Kind::from_u8(buffer[255]);
 
-                    self.objects_map.insert(key.to_string(), object);
-                }
-                println!("Loaded objects")
-            }
-            Err(err) => {
-                eprintln!("ERROR Loading object descriptions to RAM {:?}", err);
-                process::exit(1);
-            }
+            let offset = u64::from_le_bytes(buffer[256..264].try_into().unwrap());
+            let size = u64::from_le_bytes(buffer[264..272].try_into().unwrap());
+
+            let key_copy = key.clone();
+            let object_descriptor = ObjectDescriptor {
+                key,
+                kind,
+                offset,
+                size,
+            };
+            let object = Object {
+                desc: object_descriptor,
+                data: vec![],
+            };
+            self.objects_map.insert(key_copy, object);
+        }
+    }
+
+    pub fn load_objects_data(&mut self, mut file: RefMut<File>) {
+        for object in self.objects_map.values_mut() {
+            let data =
+                io_service::read_object_from_file(&mut file, object.desc.offset, object.desc.size);
+
+            object.data = data.unwrap();
         }
     }
 }

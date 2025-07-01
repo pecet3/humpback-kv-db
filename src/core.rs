@@ -10,22 +10,21 @@ use clap::error;
 
 use crate::{
     DIR_PATH, io_service as io,
-    object_service::{self, Kind, Object},
+    object_service::{self, Kind, Object, ObjectDescriptor},
     store::{self},
 };
 
 pub struct Core {
-    pub store: Arc<store::StoreDb>,
-    data: Vec<u8>,
     objects: object_service::ObjectService,
     pub data_file: RefCell<File>,
+    pub desc_file: RefCell<File>,
 }
 impl Core {
     pub fn new() -> Result<Core, std::io::Error> {
         fs::create_dir_all(DIR_PATH).expect("Unable to create directory with data...");
         let data_file_path = io::get_data_filename("main");
         if !Path::new(&data_file_path).exists() {
-            File::create(&data_file_path);
+            File::create(&data_file_path)?;
         }
 
         let data_file = OpenOptions::new()
@@ -35,56 +34,53 @@ impl Core {
             .create(true)
             .open(&data_file_path)?;
 
-        let store: Arc<store::StoreDb> =
-            Arc::new(store::StoreDb::new(format!("{}/{}", DIR_PATH, "store.db")).unwrap());
+        let desc_file_path = io::get_desc_filename("main");
+        if !Path::new(&desc_file_path).exists() {
+            File::create(&desc_file_path)?;
+        }
 
+        let desc_file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .append(true)
+            .create(true)
+            .open(&desc_file_path)?;
         let mut core = Core {
-            store: store.clone(),
-            data: vec![],
-            objects: object_service::ObjectService::new(store.clone()),
+            objects: object_service::ObjectService::new(),
             data_file: RefCell::new(data_file),
+            desc_file: RefCell::new(desc_file),
         };
-        core.objects.load_objects();
+        core.objects.load_objects_desc(core.desc_file.borrow_mut());
+        core.objects.load_objects_data(core.data_file.borrow_mut());
         Ok(core)
     }
     pub fn get(&self, key: &str) -> Option<Vec<u8>> {
         println!("{:?}", self.objects.objects_map.len());
         match self.objects.objects_map.get(key) {
             Some(value) => {
-                let mut file_ref = self.data_file.borrow_mut();
-
-                let data = io::read_object_from_file(file_ref, value.offset, value.size).ok()?;
+                let data = value.data.clone();
                 Some(data)
             }
             None => None,
         }
     }
-    pub fn add(&mut self, key: &str, data: Vec<u8>) {
-        let mut obj = Object {
-            kind: Kind::String,
-            offset: 0,
-            size: data.len(),
-        };
-        let mut file_ref = self.data_file.borrow_mut();
-        let offset = io::save_object_in_file(&obj, data, file_ref).unwrap() as usize;
-        obj.offset = offset + 255;
-        self.objects.objects_map.insert(key.to_string(), obj);
+    pub fn set(&mut self, key: &str, data: Vec<u8>) {
+        let size = data.len();
 
-        match self.store.create(&store::ObjectDescriptor {
-            created_at: 0,
-            updated_at: 0,
-            last_opened_at: 0,
-            kind: Kind::Boolean,
-            offset: offset + 255,
-            size: 2,
+        let mut file_ref = self.data_file.borrow_mut();
+        let offset = io::save_object_in_file(&data, file_ref).unwrap() as usize;
+        let mut desc_file_ref = self.desc_file.borrow_mut();
+        let desc = ObjectDescriptor {
             key: key.to_string(),
-            data: vec![],
-        }) {
-            Err(e) => {
-                println!("Error during saving a file:{:?}", e.);
-            }
-            _ => {}
-        }
+            kind: Kind::String,
+            offset: offset as u64,
+            size: size as u64,
+        };
+        let desc_data = bincode::serialize(&desc).unwrap();
+        io::save_desc_in_file(&desc_data, desc_file_ref);
+
+        let obj = Object { desc: desc, data };
+        self.objects.objects_map.insert(key.to_string(), obj);
     }
 }
 // use std::fs;

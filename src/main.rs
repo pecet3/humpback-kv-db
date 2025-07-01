@@ -38,7 +38,7 @@ fn main() {
                 .split(',')
                 .filter_map(|s| s.trim().parse().ok())
                 .collect();
-            core.add(&key.to_string(), parsed_data);
+            core.set(&key.to_string(), parsed_data);
         }
     }
 }
