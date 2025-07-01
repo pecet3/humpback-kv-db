@@ -5,7 +5,7 @@ use std::{
 };
 
 use crate::{
-    DIR_PATH, groups, io_service,
+    __, DIR_PATH, io_service,
     objects::{Group, Object_descriptor},
     parser,
 };
@@ -23,7 +23,7 @@ impl ObjectStore {
         }
     }
     pub fn init(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        let groups_list_file = io_service::get_groups_list();
+        let groups_list_file = io_service::IoService::get_groups_list();
         println!("{:?}", groups_list_file);
 
         if !Path::new(&groups_list_file).exists() {
@@ -33,8 +33,7 @@ impl ObjectStore {
         println!("{:?}", groups);
 
         for group in groups {
-            let mut new_group = Group::new(&group);
-            new_group.init()?;
+            let mut new_group = Group::new(&group)?;
             self.groups.insert(group.clone(), new_group);
         }
 
@@ -47,8 +46,7 @@ impl ObjectStore {
             return Err(format!("Group '{}' already exists.", group_name).into());
         }
 
-        let mut new_group = Group::new(&group_name.to_string());
-        new_group.init()?;
+        let mut new_group = Group::new(&group_name.to_string())?;
 
         self.groups.insert(group_name.to_string(), new_group);
         self.length = self.groups.len(); // Update the length

@@ -12,35 +12,13 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Commands {
-    /// Dodaj nową grupę
-    AddGroup {
-        /// Nazwa grupy
-        name: String,
-    },
-
-    /// Dodaj obiekt do grupy
     AddObject {
-        /// Nazwa grupy
-        group: String,
-        /// Klucz obiektu
         key: String,
-        /// Dane obiektu (np. "1,2,3")
         data: String,
         kind: String,
     },
 
     GetObject {
         key: String,
-        group: Option<String>,
     },
-    // /// Wypisz obiekty w grupie
-    // ListObjects {
-    //     /// Nazwa grupy
-    //     objects: Vec<String>,
-    // },
-    GetGroup {
-        group: String,
-    },
-
-    GetAllGroups {},
 }

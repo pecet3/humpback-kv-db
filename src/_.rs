@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap, fs::{self, File, OpenOptions}, io::{Read, Seek, SeekFrom, Write}, path::Path, sync::{Arc, Mutex}, time::{}
+    cell::RefCell, collections::HashMap, fs::{self, File, OpenOptions}, io::{Read, Seek, SeekFrom, Write}, path::Path, sync::{Arc, Mutex}, time::{}
 };
 
 #[derive(Debug, Clone)]
@@ -53,6 +53,7 @@ impl Kind {
 }
 
 
+const DIR_PATH: &str = "./humpback-data";
 
 
 #[derive(Debug, Clone)]
@@ -71,35 +72,21 @@ pub struct Object_descriptor {
     pub columns: Vec<usize>,
    pub free_bytes: usize,
 }
-const DIR_PATH: &str = "./humpback-data";
-
-#[derive(Debug)]
-pub struct Group {
-    pub name: String, // Added name to Group to store its identifier
-    pub data_map: HashMap<String, Vec<u8>>,
-    pub table_map: HashMap<String, Object_descriptor>,
-    pub data_file: Option<File>,
-    pub table_file: Option<File>,
-}
 
 impl Object_descriptor {
     pub fn get_header(&self) -> [u8; 16] {
         let mut header = [0u8; 16];
 
-        // Zapisz max 4 bajty z klucza
         let mut key_part = [0u8; 4];
         let key_bytes = self.key.as_bytes();
         let len = key_bytes.len().min(4);
         key_part[0..len].copy_from_slice(&key_bytes[0..len]);
         header[0..4].copy_from_slice(&key_part);
 
-        // Zapisz 4 bajty z created_at (rzutowane z u64)
         header[4..8].copy_from_slice(&(self.created_at as u32).to_le_bytes());
 
-        // Zapisz długość danych (4 bajty)
         header[8..12].copy_from_slice(&(self.data.len() as u32).to_le_bytes());
 
-        // Zapisz next_offset (4 bajty)
         header[12..16].copy_from_slice(&(self.next_offset as u32).to_le_bytes());
 
         header
@@ -214,22 +201,19 @@ impl Object_descriptor {
 }
 
 
-
+#[derive(Debug)]
+pub struct Group {
+    pub name: String,
+    pub data_map: HashMap<String, Vec<u8>>,
+    pub table_map: HashMap<String, Object_descriptor>,
+    pub data_file: RefCell<File>,
+    pub table_file: RefCell<File>,
+}
 
 impl Group {
-    pub fn new(name: &String) -> Group {
-        Group {
-            name: name.clone(), 
-            data_map: HashMap::new(),
-            table_map: HashMap::new(),
-            data_file: None,
-            table_file: None,
-        }
-    }
-
-    pub fn init(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        let objs = io_service::get_data_filename(&self.name);
-        let objs_tab = io_service::get_table_filename(&self.name);
+    pub fn new(name: &String) -> Result<Group, Box<dyn std::error::Error>> {
+        let objs = io_service::IoService::get_data_filename(name);
+        let objs_tab = io_service::IoService::get_table_filename(name);
 
         fs::create_dir_all(DIR_PATH)?;
 
@@ -252,72 +236,46 @@ impl Group {
             .write(true)
             .create(true) 
             .open(&objs_tab)?;
-        self.data_file = Some(data_file);
-        self.table_file = Some(table_file);
-        
 
-        Ok(())
-        
+        Ok(Group {
+            name: name.clone(), 
+            data_map: HashMap::new(),
+            table_map: HashMap::new(),
+            data_file: RefCell::new(data_file),
+            table_file: RefCell::new(table_file),
+        })
     }
 
     pub fn insert_object_data(
-       &mut self,
+        &mut self,
         obj: &Object_descriptor,
     ) -> Result<u128, Box<dyn std::error::Error>> {
-        let mut file = self
-            .data_file
-            .as_ref()
-            .ok_or("Data file not initialized for this group")?
-            .try_clone()?;
-
+        // Teraz możesz bezpośrednio używać data_file
+        let mut file = self.data_file.borrow_mut();
         let offset: u128 = file.seek(SeekFrom::End(0))? as u128;
 
         let header = obj.get_header();
 
-        file.write_all(&header).expect("write header error");
-        file.write_all(&obj.data).expect("write data error");
+        file.write_all(&header)?;
+        file.write_all(&obj.data)?;
 
         let padding = vec![0u8; 255];
-        file.write_all(&padding).expect("write padding error");
+        file.write_all(&padding)?;
         
-      
         self.table_map.insert(obj.key.clone(), obj.clone());
 
         Ok(offset)
     }
-    
-    pub fn save_on_disk(
-        &mut self,
-         obj: &Object_descriptor,
-     ) -> Result<u128, Box<dyn std::error::Error>> {
-         let mut file = self
-             .data_file
-             .as_ref()
-             .ok_or("Data file not initialized for this group")?
-             .try_clone()?;
- 
-         let offset: u128 = file.seek(SeekFrom::End(0))? as u128;
- 
-         let header = obj.get_header();
- 
-         file.write_all(&header).expect("write header error");
-         file.write_all(&obj.data).expect("write data error");
- 
-         let padding = vec![0u8; 255];
-         file.write_all(&padding).expect("write padding error");
-         Ok((offset))
-     }
+
+  
+   
 
     pub fn read_Object_descriptor(
         &self,
         offset: u64,
     ) -> Result<Option<Vec<u8>>, Box<dyn std::error::Error>> {
-        // Use the open file handle for this group
-        let mut file = self
-            .data_file
-            .as_ref()
-            .ok_or("Data file not initialized for this group")?
-            .try_clone()?;
+        let mut file = self.data_file.borrow_mut();
+
         file.seek(SeekFrom::Start(offset))?;
 
         // Read header (16 bytes)
@@ -339,30 +297,7 @@ impl Group {
         Ok(Some(actual_data))
     }
 
-    // Method to update the next_offset of an Object_descriptor's data in the file
-    pub fn update_next_offset(
-        &self,
-        offset: u128,
-        next_offset_val: u32, // Renamed to avoid conflict with field name
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        // Use the open file handle for this group
-        let mut file = self
-            .data_file
-            .as_ref()
-            .ok_or("Data file not initialized for this group")?
-            .try_clone()?;
-
-        // Calculate the position of the next_offset field (12 bytes from the start of the header)
-        let next_offset_position = offset + 12;
-
-        // Seek to the next_offset field
-        file.seek(SeekFrom::Start(next_offset_position as u64))?;
-
-        // Write the updated next_offset value
-        file.write_all(&next_offset_val.to_le_bytes())?;
-
-        Ok(())
-    }
+    
 
     pub fn get_object_descriptor_by_key(
         &self,
