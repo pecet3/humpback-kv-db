@@ -1,5 +1,6 @@
 use core::fmt;
 use std::io::{Read, Seek, SeekFrom, Write};
+use std::sync::RwLock;
 use std::{cell::RefMut, collections::HashMap, fs::File, process, str::FromStr, sync::Arc};
 
 use serde::{Deserialize, Serialize};
@@ -111,13 +112,13 @@ pub struct Object {
     pub data: Vec<u8>,
 }
 pub struct ObjectService {
-    pub objects_map: HashMap<String, Object>,
+    pub objects_map: RwLock<HashMap<String, Object>>,
 }
 
 impl ObjectService {
     pub fn new() -> ObjectService {
         ObjectService {
-            objects_map: HashMap::new(),
+            objects_map: RwLock::new(HashMap::new()),
         }
     }
     pub fn load_objects_desc(&mut self, mut file: RefMut<File>) {
@@ -126,6 +127,7 @@ impl ObjectService {
         let meta = file.metadata();
         println!("{:?}", meta);
 
+        let mut objects_to_load: Vec<(String, Object)> = vec![];
         while let Ok(_) = file.read_exact(&mut buffer) {
             match bincode::deserialize::<ObjectDescriptor>(&buffer) {
                 Ok(object_descriptor) => {
@@ -134,7 +136,7 @@ impl ObjectService {
                         desc: object_descriptor,
                         data: vec![],
                     };
-                    self.objects_map.insert(key_copy, object);
+                    objects_to_load.push((key_copy, object));
                 }
                 Err(e) => {
                     println!("Failed to deserialize record: {:?}", e);
@@ -142,17 +144,37 @@ impl ObjectService {
                 }
             }
         }
+        match self.objects_map.write() {
+            Ok(mut map) => {
+                for (key, object) in objects_to_load {
+                    map.insert(key, object);
+                }
+            }
+            Err(e) => {
+                eprintln!("Loading object error: ")
+            }
+        }
+
         println!("Loaded object descriptions");
     }
 
     pub fn load_objects_data(&mut self, mut file: RefMut<File>) {
         println!("Loaded object data");
 
-        for object in self.objects_map.values_mut() {
-            let data =
-                io_service::read_object_from_file(&mut file, object.desc.offset, object.desc.size);
-
-            object.data = data.unwrap();
+        match self.objects_map.get_mut() {
+            Ok(map) => {
+                for object in map {
+                    let data = io_service::read_object_from_file(
+                        &mut file,
+                        object.1.desc.offset,
+                        object.1.desc.size,
+                    );
+                    object.1.data = data.unwrap();
+                }
+            }
+            Err(e) => {
+                eprintln!("Loading object error: ")
+            }
         }
     }
 }

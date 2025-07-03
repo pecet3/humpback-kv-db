@@ -8,30 +8,28 @@ use crate::{
     object_service::Kind,
 };
 use clap::Parser;
-use std::str::FromStr;
+use std::{error::Error, str::FromStr};
+use tokio::net::TcpListener;
 
 const DIR_PATH: &str = "./humpback-data";
 
-fn main() {
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn Error>> {
     let mut core = core::Core::new().expect("Init error");
 
-    let cli = Cli::parse();
+    let listener = TcpListener::bind("127.0.0.1:8080").await?;
+    println!("Serwer TCP uruchomiony na 127.0.0.1:8080");
 
-    // Obsługa komend CLI
-    match cli.command {
-        Commands::Get { key } => match core.get(&key.to_string()) {
-            Some(obj) => {
-                println!("{:?}", obj)
+    loop {
+        // Akceptuj nowe połączenia
+        let (socket, addr) = listener.accept().await?;
+        println!("Nowe połączenie od: {}", addr);
+
+        // Obsłuż każde połączenie w osobnym zadaniu
+        tokio::spawn(async move {
+            if let Err(e) = handle_client(socket).await {
+                eprintln!("Błąd obsługi klienta: {}", e);
             }
-            _ => {
-                println!("other")
-            }
-        },
-        Commands::Add { key, data, kind } => {
-            let parsed_data: Vec<u8> = data.as_bytes().to_vec();
-            println!("{:?}", parsed_data);
-            let kind_enum = Kind::from_str(&kind).unwrap();
-            core.set(&key.to_string(), kind_enum, parsed_data);
-        }
+        });
     }
 }
