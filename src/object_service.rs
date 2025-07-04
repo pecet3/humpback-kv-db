@@ -1,4 +1,5 @@
 use core::fmt;
+use std::error::Error;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::sync::RwLock;
 use std::{cell::RefMut, collections::HashMap, fs::File, process, str::FromStr, sync::Arc};
@@ -174,6 +175,28 @@ impl ObjectService {
             }
             Err(e) => {
                 eprintln!("Loading object error: ")
+            }
+        }
+    }
+    pub async fn get(&mut self, key: &str) -> Option<Vec<u8>> {
+        let map = self.objects_map.read();
+        match map {
+            Ok(map) => match map.get(key) {
+                Some(object) => Some(object.data.clone()),
+                None => None,
+            },
+            Err(e) => None,
+        }
+    }
+    pub fn set(&mut self, object: Object) -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
+        match self.objects_map.write() {
+            Ok(mut map) => {
+                map.insert(object.desc.key.to_string(), object);
+                Ok(())
+            }
+            Err(e) => {
+                let msg = format!("Poisoned lock: {}", e);
+                Err(msg.into())
             }
         }
     }
