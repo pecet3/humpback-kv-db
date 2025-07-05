@@ -188,7 +188,7 @@ impl ObjectService {
             Err(e) => None,
         }
     }
-    pub fn set(&mut self, object: Object) -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
+    pub async fn set(&mut self, object: Object) -> Result<(), Box<dyn Error>> {
         match self.objects_map.write() {
             Ok(mut map) => {
                 map.insert(object.desc.key.to_string(), object);

@@ -53,18 +53,10 @@ impl Core {
         core.objects.load_objects_data(core.data_file.borrow_mut());
         Ok(core)
     }
-    pub fn get(&self, key: &str) -> Option<Vec<u8>> {
-        println!("{:?}", self.objects.objects_map.len());
-        match self.objects.objects_map.get(key) {
-            Some(value) => {
-                let data = value.data.clone();
-                println!("data: {:?}", value);
-                Some(data)
-            }
-            None => None,
-        }
+    pub async fn get(mut self, key: &str) -> Option<Vec<u8>> {
+        return self.objects.get(key).await;
     }
-    pub fn set(&mut self, key: &str, kind: Kind, data: Vec<u8>) {
+    pub async fn set(&mut self, key: &str, kind: Kind, data: Vec<u8>) {
         let size = data.len();
 
         let file_ref = self.data_file.borrow_mut();
@@ -95,6 +87,6 @@ impl Core {
             },
             data,
         };
-        self.objects.objects_map.insert(key.to_string(), obj);
+        self.objects.set(obj).await.unwrap();
     }
 }
