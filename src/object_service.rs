@@ -177,7 +177,7 @@ impl ObjectService {
             }
         }
     }
-    pub async fn get(&mut self, key: &str) -> Option<Vec<u8>> {
+    pub async fn get(&self, key: &str) -> Option<Vec<u8>> {
         let map = self.objects_map.read();
         match map {
             Ok(map) => match map.get(key) {
@@ -187,7 +187,7 @@ impl ObjectService {
             Err(e) => None,
         }
     }
-    pub async fn set(&mut self, object: Object) -> Result<(), Box<dyn Error>> {
+    pub async fn set(&self, object: Object) -> Result<(), Box<dyn Error>> {
         match self.objects_map.write() {
             Ok(mut map) => {
                 map.insert(object.desc.key.to_string(), object);

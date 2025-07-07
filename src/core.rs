@@ -52,13 +52,21 @@ impl Core {
         core.objects.load_objects_data(Arc::clone(&core.data_file));
         Ok(core)
     }
-    pub async fn get(mut self, key: &str) -> Option<Vec<u8>> {
+    pub async fn get(&self, key: &str) -> Option<Vec<u8>> {
         return self.objects.get(key).await;
     }
     pub async fn set(&mut self, key: &str, kind: Kind, data: Vec<u8>) {
         let size = data.len();
 
-        let offset = io::save_object_in_file(&data, Arc::clone(&self.data_file)).unwrap() as usize;
+        let data_file = Arc::clone(&self.data_file);
+        let data_clone = data.clone();
+
+        let offset =
+            tokio::task::spawn_blocking(move || io::save_object_in_file(&data_clone, data_file))
+                .await
+                .expect("spawn_blocking failed")
+                .expect("Failed to write data") as usize;
+
         let desc = ObjectDescriptor {
             key: Key255::new(key),
             kind: kind.clone(),
@@ -67,14 +75,13 @@ impl Core {
         };
 
         let desc_data = bincode::serialize(&desc).unwrap();
-        println!("data: {:?}", data);
-        match io::save_desc_in_file(&desc_data, Arc::clone(&self.desc_file)) {
-            Err(e) => panic!("{}", e),
+        let desc_file = Arc::clone(&self.desc_file);
 
-            _ => {
-                println!("set an object")
-            }
-        }
+        tokio::task::spawn_blocking(move || io::save_desc_in_file(&desc_data, desc_file))
+            .await
+            .expect("spawn_blocking failed")
+            .expect("Failed to write descriptor");
+
         let obj = Object {
             desc: ObjectDescriptor {
                 key: Key255::new(key),
