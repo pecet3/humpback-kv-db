@@ -1,9 +1,8 @@
 use std::{
-    cell::RefCell,
     fs::{self, File, OpenOptions},
     path::Path,
     ptr::null,
-    sync::Arc,
+    sync::{Arc, Mutex},
 };
 
 use clap::error;
@@ -15,8 +14,8 @@ use crate::{
 
 pub struct Core {
     objects: object_service::ObjectService,
-    pub data_file: RefCell<File>,
-    pub desc_file: RefCell<File>,
+    pub data_file: Arc<Mutex<File>>,
+    pub desc_file: Arc<Mutex<File>>,
 }
 impl Core {
     pub fn new() -> Result<Core, std::io::Error> {
@@ -46,11 +45,11 @@ impl Core {
             .open(&desc_file_path)?;
         let mut core = Core {
             objects: object_service::ObjectService::new(),
-            data_file: RefCell::new(data_file),
-            desc_file: RefCell::new(desc_file),
+            data_file: Arc::new(Mutex::new(data_file)),
+            desc_file: Arc::new(Mutex::new(desc_file)),
         };
-        core.objects.load_objects_desc(core.desc_file.borrow_mut());
-        core.objects.load_objects_data(core.data_file.borrow_mut());
+        core.objects.load_objects_desc(Arc::clone(&core.desc_file));
+        core.objects.load_objects_data(Arc::clone(&core.data_file));
         Ok(core)
     }
     pub async fn get(mut self, key: &str) -> Option<Vec<u8>> {
@@ -59,9 +58,7 @@ impl Core {
     pub async fn set(&mut self, key: &str, kind: Kind, data: Vec<u8>) {
         let size = data.len();
 
-        let file_ref = self.data_file.borrow_mut();
-        let offset = io::save_object_in_file(&data, file_ref).unwrap() as usize;
-        let desc_file_ref = self.desc_file.borrow_mut();
+        let offset = io::save_object_in_file(&data, Arc::clone(&self.data_file)).unwrap() as usize;
         let desc = ObjectDescriptor {
             key: Key255::new(key),
             kind: kind.clone(),
@@ -71,7 +68,7 @@ impl Core {
 
         let desc_data = bincode::serialize(&desc).unwrap();
         println!("data: {:?}", data);
-        match io::save_desc_in_file(&desc_data, desc_file_ref) {
+        match io::save_desc_in_file(&desc_data, Arc::clone(&self.desc_file)) {
             Err(e) => panic!("{}", e),
 
             _ => {

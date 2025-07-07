@@ -1,16 +1,17 @@
 use crate::DIR_PATH;
 
-use std::cell::RefMut;
 use std::error::Error;
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom, Write};
+use std::sync::{Arc, Mutex};
 
 const HEADER_SIZE: i64 = 8;
 
 pub fn save_desc_in_file(
     data: &Vec<u8>,
-    mut file: RefMut<File>,
+    file: Arc<Mutex<File>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    let mut file = file.lock().unwrap();
     file.write_all(&data).expect("write data error");
 
     Ok(())
@@ -18,8 +19,10 @@ pub fn save_desc_in_file(
 
 pub fn save_object_in_file(
     data: &Vec<u8>,
-    mut file: RefMut<File>,
+    file: Arc<Mutex<File>>,
 ) -> Result<u64, Box<dyn std::error::Error>> {
+    let mut file = file.lock().unwrap();
+
     let offset: u64 = file.seek(SeekFrom::End(0))? as u64;
 
     let header = create_header(data.len() as u64);
@@ -30,10 +33,12 @@ pub fn save_object_in_file(
     Ok(offset)
 }
 pub fn read_object_from_file(
-    file: &mut RefMut<File>,
+    file: Arc<Mutex<File>>,
     offset: u64,
     size: u64,
 ) -> Result<Vec<u8>, Box<dyn Error>> {
+    let mut file = file.lock().unwrap();
+
     file.seek(SeekFrom::Start(offset as u64))?;
 
     file.seek(SeekFrom::Current(HEADER_SIZE as i64))?;

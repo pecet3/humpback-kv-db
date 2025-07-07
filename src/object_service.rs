@@ -1,7 +1,7 @@
 use core::fmt;
 use std::error::Error;
 use std::io::{Read, Seek, SeekFrom, Write};
-use std::sync::RwLock;
+use std::sync::{Mutex, RwLock};
 use std::{cell::RefMut, collections::HashMap, fs::File, process, str::FromStr, sync::Arc};
 
 use serde::{Deserialize, Serialize};
@@ -122,11 +122,10 @@ impl ObjectService {
             objects_map: RwLock::new(HashMap::new()),
         }
     }
-    pub fn load_objects_desc(&mut self, mut file: RefMut<File>) {
+    pub fn load_objects_desc(&mut self, file: Arc<Mutex<File>>) {
         const RECORD_SIZE: usize = 283;
         let mut buffer = vec![0u8; RECORD_SIZE];
-        let meta = file.metadata();
-        println!("{:?}", meta);
+        let mut file = file.lock().expect("Failed to lock desc_file");
 
         let mut objects_to_load: Vec<(String, Object)> = vec![];
         while let Ok(_) = file.read_exact(&mut buffer) {
@@ -159,14 +158,14 @@ impl ObjectService {
         println!("Loaded object descriptions");
     }
 
-    pub fn load_objects_data(&mut self, mut file: RefMut<File>) {
+    pub fn load_objects_data(&mut self, file: Arc<Mutex<File>>) {
         println!("Loaded object data");
 
         match self.objects_map.get_mut() {
             Ok(map) => {
                 for object in map {
                     let data = io_service::read_object_from_file(
-                        &mut file,
+                        Arc::clone(&file),
                         object.1.desc.offset,
                         object.1.desc.size,
                     );
