@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::io_service;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum Kind {
     Number,
     Boolean,
@@ -207,11 +207,49 @@ impl ObjectService {
             }
         }
     }
+    pub fn delete(&self, key: String) -> Result<(), Box<dyn Error>> {
+        match self.objects_map.write() {
+            Ok(mut map) => {
+                map.remove(&key);
+                Ok(())
+            }
+            Err(e) => {
+                let msg = format!("Poisoned lock: {}", e);
+                Err(msg.into())
+            }
+        }
+    }
     pub fn list(&self) -> Result<Vec<ObjectListElement>, Box<dyn Error + Send + Sync>> {
         match self.objects_map.read() {
             Ok(map) => {
                 let mut list: Vec<ObjectListElement> = map
                     .iter()
+                    .map(|(key, obj)| ObjectListElement {
+                        key: key.clone(),
+                        kind: obj.desc.kind.clone(),
+                        size: obj.desc.size,
+                        offset: obj.desc.offset,
+                    })
+                    .collect();
+
+                list.sort_by_key(|elem| elem.offset);
+                Ok(list)
+            }
+            Err(e) => {
+                let msg = format!("Poisoned lock: {}", e);
+                Err(msg.into())
+            }
+        }
+    }
+    pub fn list_by_kind(
+        &self,
+        kind: Kind,
+    ) -> Result<Vec<ObjectListElement>, Box<dyn Error + Send + Sync>> {
+        match self.objects_map.read() {
+            Ok(map) => {
+                let mut list: Vec<ObjectListElement> = map
+                    .iter()
+                    .filter(|(_, obj)| obj.desc.kind == kind)
                     .map(|(key, obj)| ObjectListElement {
                         key: key.clone(),
                         kind: obj.desc.kind.clone(),

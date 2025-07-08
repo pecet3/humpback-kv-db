@@ -95,4 +95,10 @@ impl Core {
     pub async fn list(&self) -> Result<Vec<ObjectListElement>, Box<dyn Error + Send + Sync>> {
         return self.objects.list();
     }
+    pub async fn list_by_kind(
+        &self,
+        kind: Kind,
+    ) -> Result<Vec<ObjectListElement>, Box<dyn Error + Send + Sync>> {
+        return self.objects.list_by_kind(kind);
+    }
 }

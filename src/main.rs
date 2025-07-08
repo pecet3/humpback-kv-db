@@ -52,15 +52,16 @@ async fn handle_client(socket: TcpStream, core: Arc<Core>) -> Result<(), Box<dyn
                 match data {
                     Some(data) => {
                         writer.write_all(&data).await?;
+                        writer.write_all(b"\n").await?;
                     }
                     None => {
-                        writer.write_all(b"NOT_FOUND\n").await?;
+                        writer.write_all(b"> NOT_FOUND\n").await?;
                     }
                 }
             }
             ["SET", key, kind] => {
                 let kind = Kind::from_str(kind).unwrap();
-                writer.write_all(b"READY\n").await?;
+                writer.write_all(b"> WRITE DATA\n").await?;
                 let mut data_buf = vec![0; 1024 * 4];
                 let data_size = buf_reader.read(&mut data_buf).await?;
                 data_buf.truncate(data_size);
@@ -68,7 +69,7 @@ async fn handle_client(socket: TcpStream, core: Arc<Core>) -> Result<(), Box<dyn
                 core.set(key, kind, data_buf).await;
                 let duration = start.elapsed();
                 println!("SET completed in {:.2?} ({} bytes)", duration, data_size);
-                writer.write_all(b"SUCCESS\n").await?;
+                writer.write_all(b"> SUCCESS\n").await?;
             }
             ["LIST"] => {
                 let start = std::time::Instant::now();
@@ -80,8 +81,10 @@ async fn handle_client(socket: TcpStream, core: Arc<Core>) -> Result<(), Box<dyn
                                 .iter()
                                 .map(|element| {
                                     format!(
-                                        "{} <{}> size: {}",
-                                        element.key, element.kind, element.size
+                                        "[{}] <{}> size: {}",
+                                        element.key,
+                                        element.kind.to_string().to_uppercase(),
+                                        element.size
                                     )
                                 })
                                 .collect::<Vec<_>>()
@@ -90,7 +93,35 @@ async fn handle_client(socket: TcpStream, core: Arc<Core>) -> Result<(), Box<dyn
                         }
                     }
                     Err(_) => {
-                        writer.write_all(b"ERR Unable to list objects\n").await?;
+                        writer.write_all(b"> ERR Unable to list objects\n").await?;
+                    }
+                }
+                let duration = start.elapsed();
+                println!("LIST completed in {:.2?}", duration);
+            }
+            ["LIST_TYPE", kind] => {
+                let start = std::time::Instant::now();
+                let kind_enum = match Kind::from_str(&kind) {
+                    Ok(k) => k,
+                    Err(_) => {
+                        writer.write_all(b"> ERR Invalid type\n").await?;
+                        continue;
+                    }
+                };
+
+                match core.list_by_kind(kind_enum).await {
+                    Ok(list) => {
+                        for chunk in list.chunks(2) {
+                            let line = chunk
+                                .iter()
+                                .map(|element| format!("[{}] size: {}", element.key, element.size))
+                                .collect::<Vec<_>>()
+                                .join(" | ");
+                            writer.write_all(format!("{}\n", line).as_bytes()).await?;
+                        }
+                    }
+                    Err(_) => {
+                        writer.write_all(b"> ERR Unable to list objects\n").await?;
                     }
                 }
                 let duration = start.elapsed();
@@ -98,7 +129,10 @@ async fn handle_client(socket: TcpStream, core: Arc<Core>) -> Result<(), Box<dyn
             }
             _ => {
                 writer
-                    .write_all(b"ERR Invalid command. Use GET <key> or SET <key> <kind>\n")
+                    .write_all(
+                        b"> ERR Invalid command. Use one of: \
+                    GET <key> | SET <key> <type> | LIST | LIST_TYPE <type>\n",
+                    )
                     .await?;
             }
         }
