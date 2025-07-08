@@ -1,7 +1,6 @@
 mod core;
 mod io_service;
 mod object_service;
-mod parser;
 use crate::{core::Core, object_service::Kind};
 use std::{error::Error, str::FromStr, sync::Arc};
 use tokio::{
@@ -58,6 +57,19 @@ async fn handle_client(socket: TcpStream, core: Arc<Core>) -> Result<(), Box<dyn
                         writer.write_all(b"> NOT_FOUND\n").await?;
                     }
                 }
+            }
+            ["DELETE", key] => {
+                let start = std::time::Instant::now();
+                match core.delete_soft(key).await {
+                    Ok(_) => {
+                        writer.write_all(b"> SUCCESS\n").await?;
+                    }
+                    Err(_) => {
+                        writer.write_all(b"> NOT_FOUND\n").await?;
+                    }
+                }
+                let duration = start.elapsed();
+                println!("DELETE completed in {:.2?}", duration);
             }
             ["SET", key, kind] => {
                 let kind = Kind::from_str(kind).unwrap();

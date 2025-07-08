@@ -12,7 +12,7 @@ use crate::{
 };
 
 pub struct Core {
-    objects: object_service::ObjectService,
+    pub objects: object_service::ObjectService,
     pub data_file: Arc<Mutex<File>>,
     pub desc_file: Arc<Mutex<File>>,
 }
@@ -64,33 +64,57 @@ impl Core {
             tokio::task::spawn_blocking(move || io::save_object_in_file(&data_clone, data_file))
                 .await
                 .expect("spawn_blocking failed")
-                .expect("Failed to write data") as usize;
+                .expect("Failed to write data") as u64;
 
         let desc = ObjectDescriptor {
             key: Key255::new(key),
             kind: kind.clone(),
-            offset: offset as u64,
+            offset,
             size: size as u64,
+            is_deleted: false,
+            desc_offset: 0,
         };
 
         let desc_data = bincode::serialize(&desc).unwrap();
         let desc_file = Arc::clone(&self.desc_file);
 
-        tokio::task::spawn_blocking(move || io::save_desc_in_file(&desc_data, desc_file))
-            .await
-            .expect("spawn_blocking failed")
-            .expect("Failed to write descriptor");
-
+        let desc_offset =
+            tokio::task::spawn_blocking(move || io::save_desc_in_file(desc_data, desc_file))
+                .await
+                .expect("spawn_blocking failed")
+                .expect("Failed to write descriptor");
+        println!("{}", desc_offset);
         let obj = Object {
             desc: ObjectDescriptor {
                 key: Key255::new(key),
                 kind: kind,
                 offset: offset as u64,
                 size: size as u64,
+                is_deleted: false,
+                desc_offset,
             },
             data,
         };
         self.objects.set(obj).unwrap();
+    }
+    pub async fn delete_soft(&self, key: &str) -> Result<(), Box<dyn Error + Send + Sync>> {
+        let object = self
+            .objects
+            .delete(key.to_string())
+            .map_err(|e| format!("Failed to mark object as deleted: {}", e))?;
+
+        let data =
+            bincode::serialize(&object.desc).map_err(|e| format!("Serialization error: {}", e))?;
+
+        let desc_file: Arc<Mutex<File>> = Arc::clone(&self.desc_file);
+
+        tokio::task::spawn_blocking(move || {
+            io::update_chunk_in_file(object.desc.desc_offset, data, desc_file)
+        })
+        .await
+        .expect("spawn_blocking failed")
+        .expect("Failed to write data");
+        Ok(())
     }
     pub async fn list(&self) -> Result<Vec<ObjectListElement>, Box<dyn Error + Send + Sync>> {
         return self.objects.list();

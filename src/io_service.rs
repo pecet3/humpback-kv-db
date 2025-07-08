@@ -7,14 +7,33 @@ use std::sync::{Arc, Mutex};
 
 const HEADER_SIZE: i64 = 8;
 
-pub fn save_desc_in_file(
-    data: &Vec<u8>,
+pub fn update_chunk_in_file(
+    offset: u64,
+    data: Vec<u8>,
     file: Arc<Mutex<File>>,
-) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+) -> Result<(), Box<dyn Error + Send + Sync>> {
     let mut file = file.lock().unwrap();
-    file.write_all(&data).expect("write data error");
+    file.seek(SeekFrom::Start(offset))?;
+    file.write_all(&data)?;
 
     Ok(())
+}
+
+pub fn save_desc_in_file(
+    mut data: Vec<u8>,
+    file: Arc<Mutex<File>>,
+) -> Result<u64, Box<dyn std::error::Error + Send + Sync>> {
+    let mut file = file.lock().unwrap();
+    let offset: u64 = file.seek(SeekFrom::End(0))? as u64;
+
+    let offset_bytes = offset.to_le_bytes();
+
+    let start = data.len() - 8;
+    data[start..].copy_from_slice(&offset_bytes);
+
+    file.write_all(&data).expect("write data error");
+
+    Ok(offset)
 }
 
 pub fn save_object_in_file(
@@ -50,7 +69,7 @@ pub fn read_object_from_file(
 }
 
 pub fn get_desc_filename(prefix: &str) -> String {
-    format!("{}/{}.Table.bindb", DIR_PATH, prefix)
+    format!("{}/{}.Desc.bindb", DIR_PATH, prefix)
 }
 pub fn get_data_filename(prefix: &str) -> String {
     format!("{}/{}.Data.bindb", DIR_PATH, prefix)

@@ -107,15 +107,17 @@ pub struct ObjectListElement {
     pub kind: Kind,
     pub offset: u64,
 }
-
+const RECORD_SIZE: usize = 292;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ObjectDescriptor {
     pub key: Key255,
     pub kind: Kind,
     pub offset: u64,
     pub size: u64,
+    pub is_deleted: bool,
+    pub desc_offset: u64,
 }
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Object {
     pub desc: ObjectDescriptor,
     pub data: Vec<u8>,
@@ -130,8 +132,11 @@ impl ObjectService {
             objects_map: RwLock::new(HashMap::new()),
         }
     }
+    pub fn get_desc_raw_bytes(&self, desc: ObjectDescriptor) -> Result<Vec<u8>, Box<dyn Error>> {
+        let bytes = bincode::serialize(&desc)?;
+        Ok(bytes)
+    }
     pub fn load_objects_desc(&self, file: Arc<Mutex<File>>) {
-        const RECORD_SIZE: usize = 283;
         let mut buffer = vec![0u8; RECORD_SIZE];
         let mut file = file.lock().expect("Failed to lock desc_file");
 
@@ -141,9 +146,13 @@ impl ObjectService {
                 Ok(object_descriptor) => {
                     let key_copy = object_descriptor.key.to_string();
                     let object = Object {
-                        desc: object_descriptor,
+                        desc: object_descriptor.clone(),
                         data: vec![],
                     };
+                    if object_descriptor.is_deleted {
+                        continue;
+                    }
+
                     objects_to_load.push((key_copy, object));
                 }
                 Err(e) => {
@@ -207,11 +216,14 @@ impl ObjectService {
             }
         }
     }
-    pub fn delete(&self, key: String) -> Result<(), Box<dyn Error>> {
+    pub fn delete(&self, key: String) -> Result<Object, Box<dyn Error + Send + Sync>> {
         match self.objects_map.write() {
             Ok(mut map) => {
+                let obj = map.get(&key).ok_or("Object not found")?;
+                let mut obj_copy = obj.clone();
+                obj_copy.desc.is_deleted = true;
                 map.remove(&key);
-                Ok(())
+                Ok(obj_copy)
             }
             Err(e) => {
                 let msg = format!("Poisoned lock: {}", e);
