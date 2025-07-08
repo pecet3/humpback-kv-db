@@ -122,7 +122,7 @@ impl ObjectService {
             objects_map: RwLock::new(HashMap::new()),
         }
     }
-    pub fn load_objects_desc(&mut self, file: Arc<Mutex<File>>) {
+    pub fn load_objects_desc(&self, file: Arc<Mutex<File>>) {
         const RECORD_SIZE: usize = 283;
         let mut buffer = vec![0u8; RECORD_SIZE];
         let mut file = file.lock().expect("Failed to lock desc_file");

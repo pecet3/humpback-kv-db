@@ -55,7 +55,7 @@ impl Core {
     pub async fn get(&self, key: &str) -> Option<Vec<u8>> {
         return self.objects.get(key).await;
     }
-    pub async fn set(&mut self, key: &str, kind: Kind, data: Vec<u8>) {
+    pub async fn set(&self, key: &str, kind: Kind, data: Vec<u8>) {
         let size = data.len();
 
         let data_file = Arc::clone(&self.data_file);

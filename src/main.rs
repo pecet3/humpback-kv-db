@@ -11,7 +11,7 @@ use crate::{
 use clap::Parser;
 use std::{error::Error, str::FromStr, sync::Arc};
 use tokio::{
-    io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
+    io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader},
     net::{TcpListener, TcpStream},
 };
 
@@ -51,7 +51,7 @@ async fn handle_client(socket: TcpStream, core: Arc<Core>) -> Result<(), Box<dyn
 
         match parts.as_slice() {
             ["GET", key] => {
-                let data = core.clone().get(key).await;
+                let data = core.get(key).await;
                 match data {
                     Some(data) => {
                         writer.write_all(b"OK\n").await?;
@@ -63,7 +63,15 @@ async fn handle_client(socket: TcpStream, core: Arc<Core>) -> Result<(), Box<dyn
                     }
                 }
             }
+            ["SET", key, kind] => {
+                let kind = Kind::from_str(kind).unwrap();
+                writer.write_all(b"READY\n").await?;
+                let mut data_buf = vec![0; 1024 * 4];
+                let data_size = buf_reader.read(&mut data_buf).await?;
+                data_buf.truncate(data_size);
 
+                core.set(key, kind, data_buf).await;
+            }
             _ => {
                 writer
                     .write_all(b"ERR Invalid command. Use GET <key> or SET <key> <kind>\n")
