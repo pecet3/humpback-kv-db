@@ -54,7 +54,7 @@ async fn handle_client(socket: TcpStream, core: Arc<Core>) -> Result<(), Box<dyn
                         writer.write_all(b"\n").await?;
                     }
                     None => {
-                        writer.write_all(b"> NOT_FOUND\n").await?;
+                        writer.write_all(b"> NOT FOUND\n").await?;
                     }
                 }
             }
@@ -65,13 +65,19 @@ async fn handle_client(socket: TcpStream, core: Arc<Core>) -> Result<(), Box<dyn
                         writer.write_all(b"> SUCCESS\n").await?;
                     }
                     Err(_) => {
-                        writer.write_all(b"> NOT_FOUND\n").await?;
+                        writer.write_all(b"> NOT FOUND\n").await?;
                     }
                 }
                 let duration = start.elapsed();
                 println!("DELETE completed in {:.2?}", duration);
             }
             ["SET", key, kind] => {
+                if key.len() > 255 {
+                    writer
+                        .write_all(b"> ERR Key is too long. Max length - 255 bytes\n")
+                        .await?;
+                    continue;
+                }
                 let kind = Kind::from_str(kind).unwrap();
                 writer.write_all(b"> WRITE DATA\n").await?;
                 let mut data_buf = vec![0; 1024 * 4];
