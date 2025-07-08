@@ -100,6 +100,14 @@ impl Key255 {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct ObjectListElement {
+    pub key: String,
+    pub size: u64,
+    pub kind: Kind,
+    pub offset: u64,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ObjectDescriptor {
     pub key: Key255,
@@ -177,7 +185,7 @@ impl ObjectService {
             }
         }
     }
-    pub async fn get(&self, key: &str) -> Option<Vec<u8>> {
+    pub fn get(&self, key: &str) -> Option<Vec<u8>> {
         let map = self.objects_map.read();
         match map {
             Ok(map) => match map.get(key) {
@@ -187,11 +195,33 @@ impl ObjectService {
             Err(e) => None,
         }
     }
-    pub async fn set(&self, object: Object) -> Result<(), Box<dyn Error>> {
+    pub fn set(&self, object: Object) -> Result<(), Box<dyn Error>> {
         match self.objects_map.write() {
             Ok(mut map) => {
                 map.insert(object.desc.key.to_string(), object);
                 Ok(())
+            }
+            Err(e) => {
+                let msg = format!("Poisoned lock: {}", e);
+                Err(msg.into())
+            }
+        }
+    }
+    pub fn list(&self) -> Result<Vec<ObjectListElement>, Box<dyn Error + Send + Sync>> {
+        match self.objects_map.read() {
+            Ok(map) => {
+                let mut list: Vec<ObjectListElement> = map
+                    .iter()
+                    .map(|(key, obj)| ObjectListElement {
+                        key: key.clone(),
+                        kind: obj.desc.kind.clone(),
+                        size: obj.desc.size,
+                        offset: obj.desc.offset,
+                    })
+                    .collect();
+
+                list.sort_by_key(|elem| elem.offset);
+                Ok(list)
             }
             Err(e) => {
                 let msg = format!("Poisoned lock: {}", e);

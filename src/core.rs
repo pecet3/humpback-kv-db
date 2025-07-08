@@ -1,15 +1,14 @@
 use std::{
+    error::Error,
     fs::{self, File, OpenOptions},
     path::Path,
     ptr::null,
     sync::{Arc, Mutex},
 };
 
-use clap::error;
-
 use crate::{
     DIR_PATH, io_service as io,
-    object_service::{self, Key255, Kind, Object, ObjectDescriptor},
+    object_service::{self, Key255, Kind, Object, ObjectDescriptor, ObjectListElement},
 };
 
 pub struct Core {
@@ -53,7 +52,7 @@ impl Core {
         Ok(core)
     }
     pub async fn get(&self, key: &str) -> Option<Vec<u8>> {
-        return self.objects.get(key).await;
+        return self.objects.get(key);
     }
     pub async fn set(&self, key: &str, kind: Kind, data: Vec<u8>) {
         let size = data.len();
@@ -91,6 +90,9 @@ impl Core {
             },
             data,
         };
-        self.objects.set(obj).await.unwrap();
+        self.objects.set(obj).unwrap();
+    }
+    pub async fn list(&self) -> Result<Vec<ObjectListElement>, Box<dyn Error + Send + Sync>> {
+        return self.objects.list();
     }
 }

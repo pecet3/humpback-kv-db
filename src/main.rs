@@ -1,14 +1,8 @@
-mod cli;
 mod core;
 mod io_service;
 mod object_service;
 mod parser;
-use crate::{
-    cli::{Cli, Commands},
-    core::Core,
-    object_service::Kind,
-};
-use clap::Parser;
+use crate::{core::Core, object_service::Kind};
 use std::{error::Error, str::FromStr, sync::Arc};
 use tokio::{
     io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader},
@@ -51,12 +45,13 @@ async fn handle_client(socket: TcpStream, core: Arc<Core>) -> Result<(), Box<dyn
 
         match parts.as_slice() {
             ["GET", key] => {
+                let start = std::time::Instant::now();
                 let data = core.get(key).await;
+                let duration = start.elapsed();
+                println!("GET completed in {:.2?}", duration);
                 match data {
                     Some(data) => {
-                        writer.write_all(b"OK\n").await?;
                         writer.write_all(&data).await?;
-                        writer.write_all(b"\n").await?;
                     }
                     None => {
                         writer.write_all(b"NOT_FOUND\n").await?;
@@ -69,8 +64,37 @@ async fn handle_client(socket: TcpStream, core: Arc<Core>) -> Result<(), Box<dyn
                 let mut data_buf = vec![0; 1024 * 4];
                 let data_size = buf_reader.read(&mut data_buf).await?;
                 data_buf.truncate(data_size);
-
+                let start = std::time::Instant::now();
                 core.set(key, kind, data_buf).await;
+                let duration = start.elapsed();
+                println!("SET completed in {:.2?} ({} bytes)", duration, data_size);
+                writer.write_all(b"SUCCESS\n").await?;
+            }
+            ["LIST"] => {
+                let start = std::time::Instant::now();
+
+                match core.list().await {
+                    Ok(list) => {
+                        for chunk in list.chunks(2) {
+                            let line = chunk
+                                .iter()
+                                .map(|element| {
+                                    format!(
+                                        "{} <{}> size: {}",
+                                        element.key, element.kind, element.size
+                                    )
+                                })
+                                .collect::<Vec<_>>()
+                                .join(" | ");
+                            writer.write_all(format!("{}\n", line).as_bytes()).await?;
+                        }
+                    }
+                    Err(_) => {
+                        writer.write_all(b"ERR Unable to list objects\n").await?;
+                    }
+                }
+                let duration = start.elapsed();
+                println!("LIST completed in {:.2?}", duration);
             }
             _ => {
                 writer
