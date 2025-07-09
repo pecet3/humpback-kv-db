@@ -1,8 +1,8 @@
 use core::fmt;
 use std::error::Error;
-use std::io::{Read, Seek, SeekFrom, Write};
+use std::io::Read;
 use std::sync::{Mutex, RwLock};
-use std::{cell::RefMut, collections::HashMap, fs::File, process, str::FromStr, sync::Arc};
+use std::{collections::HashMap, fs::File, str::FromStr, sync::Arc};
 
 use serde::{Deserialize, Serialize};
 
@@ -14,7 +14,7 @@ pub enum Kind {
     Boolean,
     String,
     Json,
-    Struct,
+    Blob,
 }
 impl FromStr for Kind {
     type Err = ();
@@ -25,7 +25,7 @@ impl FromStr for Kind {
             "boolean" => Ok(Kind::Boolean),
             "string" => Ok(Kind::String),
             "json" => Ok(Kind::Json),
-            "struct" => Ok(Kind::Struct),
+            "Blob" => Ok(Kind::Blob),
             _ => Err(()),
         }
     }
@@ -37,56 +37,30 @@ impl fmt::Display for Kind {
             Kind::Boolean => "boolean",
             Kind::String => "string",
             Kind::Json => "json",
-            Kind::Struct => "struct",
+            Kind::Blob => "Blob",
         };
         write!(f, "{}", s)
     }
 }
-impl Kind {
-    pub fn from_u8(value: u8) -> Kind {
-        match value {
-            0 => Kind::Number,
-            1 => Kind::Boolean,
-            2 => Kind::String,
-            3 => Kind::Json,
-            4 => Kind::Struct,
-            _ => Kind::Struct,
-        }
-    }
-
-    pub fn to_u8(&self) -> u8 {
-        match self {
-            Kind::Number => 0,
-            Kind::Boolean => 1,
-            Kind::String => 2,
-            Kind::Json => 3,
-            Kind::Struct => 4,
-        }
-    }
-}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Key255 {
+pub struct Key256 {
     pub bytes: Vec<u8>,
 }
 
-impl Key255 {
+impl Key256 {
     pub fn new(data: &str) -> Self {
         let bytes = data.as_bytes();
-        let mut vec = Vec::with_capacity(255);
+        let mut vec = Vec::with_capacity(256);
 
-        if bytes.len() >= 255 {
-            vec.extend_from_slice(&bytes[..255]);
+        if bytes.len() >= 256 {
+            vec.extend_from_slice(&bytes[..256]);
         } else {
             vec.extend_from_slice(bytes);
-            vec.resize(255, 0);
+            vec.resize(256, 0);
         }
 
-        Key255 { bytes: vec }
-    }
-
-    pub fn len(&self) -> usize {
-        self.bytes.len()
+        Key256 { bytes: vec }
     }
 
     pub fn to_string(&self) -> String {
@@ -107,14 +81,15 @@ pub struct ObjectListElement {
     pub kind: Kind,
     pub offset: u64,
 }
-const RECORD_SIZE: usize = 292;
+const RECORD_SIZE: usize = 294;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ObjectDescriptor {
-    pub key: Key255,
+    pub key: Key256,
     pub kind: Kind,
     pub offset: u64,
     pub size: u64,
     pub is_deleted: bool,
+    pub is_mem_store: bool,
     pub desc_offset: u64,
 }
 #[derive(Debug, Clone)]
@@ -132,10 +107,7 @@ impl ObjectService {
             objects_map: RwLock::new(HashMap::new()),
         }
     }
-    pub fn get_desc_raw_bytes(&self, desc: ObjectDescriptor) -> Result<Vec<u8>, Box<dyn Error>> {
-        let bytes = bincode::serialize(&desc)?;
-        Ok(bytes)
-    }
+
     pub fn load_objects_desc(&self, file: Arc<Mutex<File>>) {
         let mut buffer = vec![0u8; RECORD_SIZE];
         let mut file = file.lock().expect("Failed to lock desc_file");
@@ -168,16 +140,14 @@ impl ObjectService {
                 }
             }
             Err(e) => {
-                eprintln!("Loading object error: ")
+                eprintln!("Loading object error: {}", e)
             }
         }
 
-        println!("Loaded object descriptions");
+        println!("Loaded object descriptors");
     }
 
     pub fn load_objects_data(&mut self, file: Arc<Mutex<File>>) {
-        println!("Loaded object data");
-
         match self.objects_map.get_mut() {
             Ok(map) => {
                 for object in map {
@@ -190,9 +160,10 @@ impl ObjectService {
                 }
             }
             Err(e) => {
-                eprintln!("Loading object error: ")
+                eprintln!("Loading object error: {:?}", e)
             }
         }
+        println!("Loaded object data");
     }
     pub fn get(&self, key: &str) -> Option<Vec<u8>> {
         let map = self.objects_map.read();
@@ -201,7 +172,7 @@ impl ObjectService {
                 Some(object) => Some(object.data.clone()),
                 None => None,
             },
-            Err(e) => None,
+            Err(_) => None,
         }
     }
     pub fn set(&self, object: Object) -> Result<(), Box<dyn Error>> {

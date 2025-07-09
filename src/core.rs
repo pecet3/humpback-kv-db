@@ -2,13 +2,12 @@ use std::{
     error::Error,
     fs::{self, File, OpenOptions},
     path::Path,
-    ptr::null,
     sync::{Arc, Mutex},
 };
 
 use crate::{
     DIR_PATH, io_service as io,
-    object_service::{self, Key255, Kind, Object, ObjectDescriptor, ObjectListElement},
+    object_service::{self, Key256, Kind, Object, ObjectDescriptor, ObjectListElement},
 };
 
 pub struct Core {
@@ -67,11 +66,12 @@ impl Core {
                 .expect("Failed to write data") as u64;
 
         let desc = ObjectDescriptor {
-            key: Key255::new(key),
+            key: Key256::new(key),
             kind: kind.clone(),
             offset,
             size: size as u64,
             is_deleted: false,
+            is_mem_store: true,
             desc_offset: 0,
         };
 
@@ -86,11 +86,12 @@ impl Core {
         println!("{}", desc_offset);
         let obj = Object {
             desc: ObjectDescriptor {
-                key: Key255::new(key),
+                key: Key256::new(key),
                 kind: kind,
                 offset: offset as u64,
                 size: size as u64,
                 is_deleted: false,
+                is_mem_store: true,
                 desc_offset,
             },
             data,

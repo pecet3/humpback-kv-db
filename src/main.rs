@@ -2,10 +2,12 @@ mod core;
 mod io_service;
 mod object_service;
 use crate::{core::Core, object_service::Kind};
-use std::{error::Error, str::FromStr, sync::Arc};
+use std::{error::Error, io::Write, str::FromStr, sync::Arc};
 use tokio::{
     io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader},
     net::{TcpListener, TcpStream},
+    signal,
+    sync::Notify,
 };
 
 const DIR_PATH: &str = "./humpback-data";
@@ -14,19 +16,40 @@ const DIR_PATH: &str = "./humpback-data";
 async fn main() -> Result<(), Box<dyn Error>> {
     let core = core::Core::new().expect("Init error");
     let arc_core = Arc::new(core);
+    let notify_shutdown = Arc::new(Notify::new());
+
     let listener = TcpListener::bind("127.0.0.1:8080").await?;
     println!("Humpback KV Database is listening on 127.0.0.1:8080");
 
+    let shutdown_notify = Arc::clone(&notify_shutdown);
+    tokio::spawn(async move {
+        signal::ctrl_c().await.expect("Failed to listen ctrl+c");
+        shutdown_notify.notify_waiters();
+    });
+
     loop {
-        let (socket, addr) = listener.accept().await?;
-        println!("New connection from: {}", addr);
-        let core = Arc::clone(&arc_core);
-        tokio::spawn(async move {
-            if let Err(e) = handle_client(socket, core).await {
-                eprintln!("Connection error: {}", e);
+        tokio::select! {
+            Ok((socket, addr)) = listener.accept() => {
+                println!("New connection from: {}", addr);
+                let core = Arc::clone(&arc_core);
+                tokio::spawn(async move {
+                    if let Err(e) = handle_client(socket, core).await {
+                        eprintln!("Connection error: {}", e);
+                    }
+                });
             }
-        });
+            _ = notify_shutdown.notified() => {
+                break;
+            }
+        }
     }
+    println!("Exit program");
+    let exit_core = Arc::clone(&arc_core);
+    let mut desc_file = exit_core.desc_file.lock().unwrap();
+    desc_file.flush()?;
+    let mut data_file = exit_core.data_file.lock().unwrap();
+    data_file.flush()?;
+    Ok(())
 }
 
 async fn handle_client(socket: TcpStream, core: Arc<Core>) -> Result<(), Box<dyn Error>> {
@@ -50,6 +73,7 @@ async fn handle_client(socket: TcpStream, core: Arc<Core>) -> Result<(), Box<dyn
                 println!("GET completed in {:.2?}", duration);
                 match data {
                     Some(data) => {
+                        writer.write_all(b"> SUCCESS\n").await?;
                         writer.write_all(&data).await?;
                         writer.write_all(b"\n").await?;
                     }
@@ -72,15 +96,32 @@ async fn handle_client(socket: TcpStream, core: Arc<Core>) -> Result<(), Box<dyn
                 println!("DELETE completed in {:.2?}", duration);
             }
             ["SET", key, kind] => {
-                if key.len() > 255 {
+                if key.len() > 256 {
                     writer
-                        .write_all(b"> ERR Key is too long. Max length - 255 bytes\n")
+                        .write_all(b"> ERR Key is too long. Max length - 256 bytes\n")
                         .await?;
                     continue;
                 }
                 let kind = Kind::from_str(kind).unwrap();
                 writer.write_all(b"> WRITE DATA\n").await?;
-                let mut data_buf = vec![0; 1024 * 4];
+                let kind = match Kind::from_str(&kind.to_string()) {
+                    Ok(k) => k,
+                    Err(_) => {
+                        writer.write_all(b"> ERR Unknown kind\n").await?;
+                        continue;
+                    }
+                };
+
+                writer.write_all(b"> WRITE DATA\n").await?;
+
+                let buf_size = match kind {
+                    Kind::Number => 16,
+                    Kind::Boolean => 4,
+                    Kind::String => 1024 * 16,    // 16 KB
+                    Kind::Json => 1024 * 64,      // 64 KB
+                    Kind::Blob => 1024 * 256 * 4, // 1 Mb
+                };
+                let mut data_buf = vec![0; buf_size];
                 let data_size = buf_reader.read(&mut data_buf).await?;
                 data_buf.truncate(data_size);
                 let start = std::time::Instant::now();
