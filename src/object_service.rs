@@ -97,6 +97,7 @@ pub struct Object {
     pub desc: ObjectDescriptor,
     pub data: Vec<u8>,
 }
+
 pub struct ObjectService {
     pub objects_map: RwLock<HashMap<String, Object>>,
 }

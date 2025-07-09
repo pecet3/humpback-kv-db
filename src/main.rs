@@ -2,7 +2,7 @@ mod core;
 mod io_service;
 mod object_service;
 use crate::{core::Core, object_service::Kind};
-use std::{error::Error, io::Write, str::FromStr, sync::Arc};
+use std::{error::Error, str::FromStr, sync::Arc};
 use tokio::{
     io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader},
     net::{TcpListener, TcpStream},
@@ -15,7 +15,7 @@ const DIR_PATH: &str = "./humpback-data";
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let core = core::Core::new().expect("Init error");
-    let arc_core = Arc::new(core);
+
     let notify_shutdown = Arc::new(Notify::new());
 
     let listener = TcpListener::bind("127.0.0.1:8080").await?;
@@ -31,7 +31,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         tokio::select! {
             Ok((socket, addr)) = listener.accept() => {
                 println!("New connection from: {}", addr);
-                let core = Arc::clone(&arc_core);
+                let core = Arc::clone(&core);
                 tokio::spawn(async move {
                     if let Err(e) = handle_client(socket, core).await {
                         eprintln!("Connection error: {}", e);
@@ -43,12 +43,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             }
         }
     }
-    println!("Exit program");
-    let exit_core = Arc::clone(&arc_core);
-    let mut desc_file = exit_core.desc_file.lock().unwrap();
-    desc_file.flush()?;
-    let mut data_file = exit_core.data_file.lock().unwrap();
-    data_file.flush()?;
+    core.shutdown().await;
     Ok(())
 }
 
@@ -111,9 +106,6 @@ async fn handle_client(socket: TcpStream, core: Arc<Core>) -> Result<(), Box<dyn
                         continue;
                     }
                 };
-
-                writer.write_all(b"> WRITE DATA\n").await?;
-
                 let buf_size = match kind {
                     Kind::Number => 16,
                     Kind::Boolean => 4,
@@ -124,10 +116,8 @@ async fn handle_client(socket: TcpStream, core: Arc<Core>) -> Result<(), Box<dyn
                 let mut data_buf = vec![0; buf_size];
                 let data_size = buf_reader.read(&mut data_buf).await?;
                 data_buf.truncate(data_size);
-                let start = std::time::Instant::now();
                 core.set(key, kind, data_buf).await;
-                let duration = start.elapsed();
-                println!("SET completed in {:.2?} ({} bytes)", duration, data_size);
+
                 writer.write_all(b"> SUCCESS\n").await?;
             }
             ["LIST"] => {
