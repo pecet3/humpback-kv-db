@@ -14,8 +14,11 @@ pub fn update_chunk_in_file(
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     let mut file = file.lock().unwrap();
     file.seek(SeekFrom::Start(offset))?;
+    let meta = file.metadata()?;
+    println!("{}", meta.len());
+    let t: Vec<u8> = vec![0; 293];
     file.write_all(&data)?;
-
+    file.flush()?;
     Ok(())
 }
 

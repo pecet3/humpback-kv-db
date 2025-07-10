@@ -1,30 +1,19 @@
 use std::{
     error::Error,
     fs::{self, File, OpenOptions},
-    io::Write,
     path::Path,
     sync::{Arc, Mutex},
-    time::Duration,
 };
-
-use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
 use crate::{
     DIR_PATH, io_service as io,
     object_service::{self, Key256, Kind, Object, ObjectDescriptor, ObjectListElement},
 };
 
-struct SetMessage {
-    key: String,
-    kind: Kind,
-    data: Vec<u8>,
-}
-
 pub struct Core {
     pub objects: object_service::ObjectService,
     pub data_file: Arc<Mutex<File>>,
     pub desc_file: Arc<Mutex<File>>,
-    set_tx: UnboundedSender<SetMessage>,
 }
 impl Core {
     pub fn new() -> Result<Arc<Core>, std::io::Error> {
@@ -52,59 +41,63 @@ impl Core {
             .append(true)
             .create(true)
             .open(&desc_file_path)?;
-
-        let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<SetMessage>();
-
         let mut core = Core {
             objects: object_service::ObjectService::new(),
             data_file: Arc::new(Mutex::new(data_file)),
             desc_file: Arc::new(Mutex::new(desc_file)),
-            set_tx: tx,
         };
         core.objects.load_objects_desc(Arc::clone(&core.desc_file));
         core.objects.load_objects_data(Arc::clone(&core.data_file));
-        let core_arc = Arc::new(core);
-        spawn_set_task(Arc::clone(&core_arc), rx);
-        Ok(core_arc)
-    }
-    pub async fn shutdown(&self) {
-        println!("Exit program. Starting cleaning");
-        drop(self.set_tx.clone());
-        // wait for finish io task blocking
-        tokio::time::sleep(Duration::from_millis(500)).await;
 
-        let mut desc_file = self.desc_file.lock().unwrap();
-        desc_file.flush().unwrap();
-        let mut data_file = self.data_file.lock().unwrap();
-        data_file.flush().unwrap();
-        println!("Cleaning ends up. Closing...");
+        Ok(Arc::new(core))
     }
 
     pub async fn get(&self, key: &str) -> Option<Vec<u8>> {
         return self.objects.get(key);
     }
     pub async fn set(&self, key: &str, kind: Kind, data: Vec<u8>) {
-        let size = data.clone().len();
-        match self.set_tx.send(SetMessage {
-            key: key.to_string(),
-            kind: kind,
-            data,
-        }) {
-            Err(_) => {}
-            Ok(_) => {
-                let start: std::time::Instant = std::time::Instant::now();
+        let data_file = Arc::clone(&self.data_file);
+        let desc_file = Arc::clone(&self.desc_file);
+        let key_owned = key.to_string();
+        let kind_clone = kind.clone();
+        let size = data.len();
+        let data_clone = data.clone();
 
-                let duration = start.elapsed();
-                println!("SET completed in {:.2?} ({} bytes)", duration, size);
+        let obj = tokio::task::spawn_blocking(move || {
+            let offset = io::save_object_in_file(&data_clone, data_file)
+                .expect("Failed to write data") as u64;
+
+            let desc = ObjectDescriptor {
+                key: Key256::new(&key_owned),
+                kind: kind_clone.clone(),
+                offset,
+                size: size as u64,
+                is_deleted: false,
+                desc_offset: 0,
+            };
+
+            let desc_data = bincode::serialize(&desc).unwrap();
+            let desc_offset =
+                io::save_desc_in_file(desc_data, desc_file).expect("Failed to write descriptor");
+            println!("{}", desc_offset.clone());
+
+            Object {
+                desc: desc.clone(),
+                data,
             }
-        }
+        })
+        .await
+        .expect("spawn_blocking failed");
+
+        self.objects.set(obj).unwrap();
     }
+
     pub async fn delete_soft(&self, key: &str) -> Result<(), Box<dyn Error + Send + Sync>> {
-        let object = self
+        let mut object = self
             .objects
             .delete(key.to_string())
             .map_err(|e| format!("Failed to mark object as deleted: {}", e))?;
-
+        object.desc.is_deleted = true;
         let data =
             bincode::serialize(&object.desc).map_err(|e| format!("Serialization error: {}", e))?;
 
@@ -129,49 +122,49 @@ impl Core {
     }
 }
 
-fn spawn_set_task(core: Arc<Core>, mut set_rx: UnboundedReceiver<SetMessage>) {
-    tokio::task::spawn_blocking(move || {
-        while let Some(SetMessage { key, kind, data }) = set_rx.blocking_recv() {
-            let size = data.len();
+// let data_file = Arc::clone(&self.data_file);
+// let desc_file = Arc::clone(&self.desc_file);
+// let key_owned = key.to_string();
+// let kind_clone = kind.clone();
+// let size = data.len();
+// let data_clone = data.clone();
+// let mut is_existing = true;
+// let existing_offset: u64 = 0;
+// match self.objects.get(&key_owned.clone()) {
+//     None => {
+//         is_existing = false;
+//     }
+//     Some(obj) => {
 
-            let data_file = Arc::clone(&core.data_file);
-            let data_clone = data.clone();
+//     }
+// }
+// let obj = tokio::task::spawn_blocking(move || {
+//     let offset = io::save_object_in_file(&data_clone, data_file)
+//         .expect("Failed to write data") as u64;
 
-            let offset = io::save_object_in_file(&data_clone, data_file)
-                .expect("Failed to write data") as u64;
+//     let mut desc = ObjectDescriptor {
+//         key: Key256::new(&key_owned),
+//         kind: kind_clone.clone(),
+//         offset,
+//         size: size as u64,
+//         is_deleted: false,
+//         desc_offset: 0,
+//     };
 
-            let desc = ObjectDescriptor {
-                key: Key256::new(&key),
-                kind: kind.clone(),
-                offset,
-                size: size as u64,
-                is_deleted: false,
-                is_mem_store: true,
-                desc_offset: 0,
-            };
+//     let desc_data = bincode::serialize(&desc).unwrap();
+//     if !is_existing {
+//         let desc_offset = io::save_desc_in_file(desc_data, desc_file)
+//             .expect("Failed to write descriptor");
+//         desc.desc_offset = desc_offset;
+//     } else {
+//         io::update_chunk_in_file(object.desc.desc_offset, data, desc_file).unwrap();
+//     }
+//     Object {
+//         desc: desc.clone(),
+//         data,
+//     }
+// })
+// .await
+// .expect("spawn_blocking failed");
 
-            let desc_data = bincode::serialize(&desc).unwrap();
-            let desc_file = Arc::clone(&core.desc_file);
-
-            let desc_offset =
-                io::save_desc_in_file(desc_data, desc_file).expect("Failed to write descriptor");
-
-            println!("{}", desc_offset);
-
-            let obj = Object {
-                desc: ObjectDescriptor {
-                    key: Key256::new(&key),
-                    kind,
-                    offset,
-                    size: size as u64,
-                    is_deleted: false,
-                    is_mem_store: true,
-                    desc_offset,
-                },
-                data,
-            };
-            core.objects.set(obj).unwrap();
-        }
-        println!("Set task exiting – channel closed");
-    });
-}
+// self.objects.set(obj).unwrap();

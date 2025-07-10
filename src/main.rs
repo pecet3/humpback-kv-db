@@ -2,7 +2,7 @@ mod core;
 mod io_service;
 mod object_service;
 use crate::{core::Core, object_service::Kind};
-use std::{error::Error, str::FromStr, sync::Arc};
+use std::{error::Error, io::Write, str::FromStr, sync::Arc, time::Duration};
 use tokio::{
     io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader},
     net::{TcpListener, TcpStream},
@@ -43,7 +43,15 @@ async fn main() -> Result<(), Box<dyn Error>> {
             }
         }
     }
-    core.shutdown().await;
+    println!("Exit program. Start cleaning");
+    // wait for finish io task blocking
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    let exit_core = Arc::clone(&core);
+    let mut desc_file = exit_core.desc_file.lock().unwrap();
+    desc_file.flush()?;
+    let mut data_file = exit_core.data_file.lock().unwrap();
+    data_file.flush()?;
+    println!("Cleaning finished. Closing...");
     Ok(())
 }
 
@@ -116,8 +124,10 @@ async fn handle_client(socket: TcpStream, core: Arc<Core>) -> Result<(), Box<dyn
                 let mut data_buf = vec![0; buf_size];
                 let data_size = buf_reader.read(&mut data_buf).await?;
                 data_buf.truncate(data_size);
+                let start = std::time::Instant::now();
                 core.set(key, kind, data_buf).await;
-
+                let duration = start.elapsed();
+                println!("SET completed in {:.2?} ({} bytes)", duration, data_size);
                 writer.write_all(b"> SUCCESS\n").await?;
             }
             ["LIST"] => {

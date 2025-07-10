@@ -81,7 +81,7 @@ pub struct ObjectListElement {
     pub kind: Kind,
     pub offset: u64,
 }
-const RECORD_SIZE: usize = 294;
+const RECORD_SIZE: usize = 293;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ObjectDescriptor {
     pub key: Key256,
@@ -89,7 +89,6 @@ pub struct ObjectDescriptor {
     pub offset: u64,
     pub size: u64,
     pub is_deleted: bool,
-    pub is_mem_store: bool,
     pub desc_offset: u64,
 }
 #[derive(Debug, Clone)]
@@ -113,7 +112,7 @@ impl ObjectService {
         let mut buffer = vec![0u8; RECORD_SIZE];
         let mut file = file.lock().expect("Failed to lock desc_file");
 
-        let mut objects_to_load: Vec<(String, Object)> = vec![];
+        let mut objects_by_key: HashMap<String, Vec<Object>> = HashMap::new();
         while let Ok(_) = file.read_exact(&mut buffer) {
             match bincode::deserialize::<ObjectDescriptor>(&buffer) {
                 Ok(object_descriptor) => {
@@ -122,11 +121,8 @@ impl ObjectService {
                         desc: object_descriptor.clone(),
                         data: vec![],
                     };
-                    if object_descriptor.is_deleted {
-                        continue;
-                    }
 
-                    objects_to_load.push((key_copy, object));
+                    objects_by_key.entry(key_copy).or_default().push(object);
                 }
                 Err(e) => {
                     println!("Failed to deserialize record: {:?}", e);
@@ -134,9 +130,26 @@ impl ObjectService {
                 }
             }
         }
+
+        println!("{}", objects_by_key.clone().len());
+        let filtered_objects: Vec<(String, Object)> = objects_by_key
+            .into_iter()
+            .filter_map(|(key, objects)| {
+                if objects.iter().any(|obj| obj.desc.is_deleted) {
+                    None
+                } else {
+                    Some((key, objects[0].clone()))
+                }
+            })
+            .collect();
+
+        println!("{}", filtered_objects.len());
+
+        // Wrzucanie do mapy
         match self.objects_map.write() {
             Ok(mut map) => {
-                for (key, object) in objects_to_load {
+                for (key, object) in filtered_objects {
+                    println!("{}", object.desc.is_deleted);
                     map.insert(key, object);
                 }
             }
@@ -144,7 +157,6 @@ impl ObjectService {
                 eprintln!("Loading object error: {}", e)
             }
         }
-
         println!("Loaded object descriptors");
     }
 
