@@ -101,7 +101,7 @@ async fn handle_client(socket: TcpStream, core: Arc<Core>) -> Result<(), Box<dyn
             ["SET", key, kind] => {
                 if key.len() > 256 {
                     writer
-                        .write_all(b"> ERR Key is too long. Max length - 256 bytes\n")
+                        .write_all(b"> ERR Key is too long. Max key length - 256 bytes\n")
                         .await?;
                     continue;
                 }
