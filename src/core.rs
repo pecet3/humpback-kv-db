@@ -38,7 +38,7 @@ impl Core {
         let desc_file = OpenOptions::new()
             .read(true)
             .write(true)
-            .append(true)
+            .append(false)
             .create(true)
             .open(&desc_file_path)?;
         let mut core = Core {
@@ -53,7 +53,7 @@ impl Core {
     }
 
     pub async fn get(&self, key: &str) -> Option<Vec<u8>> {
-        return self.objects.get(key);
+        return self.objects.get_data(key);
     }
     pub async fn set(&self, key: &str, kind: Kind, data: Vec<u8>) {
         let data_file = Arc::clone(&self.data_file);
@@ -62,12 +62,19 @@ impl Core {
         let kind_clone = kind.clone();
         let size = data.len();
         let data_clone = data.clone();
-
+        let mut is_existing = true;
+        let mut existing_desc_offset: u64 = 0;
+        match self.objects.get_desc(&key_owned.clone()) {
+            None => {
+                is_existing = false;
+            }
+            Some(desc) => existing_desc_offset = desc.desc_offset,
+        }
         let obj = tokio::task::spawn_blocking(move || {
             let offset = io::save_object_in_file(&data_clone, data_file)
                 .expect("Failed to write data") as u64;
 
-            let desc = ObjectDescriptor {
+            let mut desc = ObjectDescriptor {
                 key: Key256::new(&key_owned),
                 kind: kind_clone.clone(),
                 offset,
@@ -77,14 +84,16 @@ impl Core {
             };
 
             let desc_data = bincode::serialize(&desc).unwrap();
-            let desc_offset =
-                io::save_desc_in_file(desc_data, desc_file).expect("Failed to write descriptor");
-            println!("{}", desc_offset.clone());
-
-            Object {
-                desc: desc.clone(),
-                data,
+            if is_existing {
+                println!("edo: {}", existing_desc_offset);
+                io::update_chunk_in_file(existing_desc_offset, desc_data, desc_file).unwrap();
+                desc.desc_offset = existing_desc_offset;
+            } else {
+                let desc_offset = io::save_desc_in_file(desc_data, desc_file)
+                    .expect("Failed to write descriptor");
+                desc.desc_offset = desc_offset;
             }
+            Object { desc, data }
         })
         .await
         .expect("spawn_blocking failed");
@@ -121,50 +130,3 @@ impl Core {
         return self.objects.list_by_kind(kind);
     }
 }
-
-// let data_file = Arc::clone(&self.data_file);
-// let desc_file = Arc::clone(&self.desc_file);
-// let key_owned = key.to_string();
-// let kind_clone = kind.clone();
-// let size = data.len();
-// let data_clone = data.clone();
-// let mut is_existing = true;
-// let existing_offset: u64 = 0;
-// match self.objects.get(&key_owned.clone()) {
-//     None => {
-//         is_existing = false;
-//     }
-//     Some(obj) => {
-
-//     }
-// }
-// let obj = tokio::task::spawn_blocking(move || {
-//     let offset = io::save_object_in_file(&data_clone, data_file)
-//         .expect("Failed to write data") as u64;
-
-//     let mut desc = ObjectDescriptor {
-//         key: Key256::new(&key_owned),
-//         kind: kind_clone.clone(),
-//         offset,
-//         size: size as u64,
-//         is_deleted: false,
-//         desc_offset: 0,
-//     };
-
-//     let desc_data = bincode::serialize(&desc).unwrap();
-//     if !is_existing {
-//         let desc_offset = io::save_desc_in_file(desc_data, desc_file)
-//             .expect("Failed to write descriptor");
-//         desc.desc_offset = desc_offset;
-//     } else {
-//         io::update_chunk_in_file(object.desc.desc_offset, data, desc_file).unwrap();
-//     }
-//     Object {
-//         desc: desc.clone(),
-//         data,
-//     }
-// })
-// .await
-// .expect("spawn_blocking failed");
-
-// self.objects.set(obj).unwrap();

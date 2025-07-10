@@ -14,6 +14,18 @@ const DIR_PATH: &str = "./humpback-data";
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
+    println!(
+        r#"
+        ────────────────────────────────────────────
+          🐋 Humpback KV Database
+          Licensed under MIT/Apache-2.0
+          
+          Created by Jakub Pacewicz 
+          http://github.com/pecet3/humpback-kv-db
+        ────────────────────────────────────────────
+        "#
+    );
+
     let core = core::Core::new().expect("Init error");
 
     let notify_shutdown = Arc::new(Notify::new());
@@ -43,15 +55,18 @@ async fn main() -> Result<(), Box<dyn Error>> {
             }
         }
     }
-    println!("Exit program. Start cleaning");
-    // wait for finish io task blocking
+    println!("Exit signal received\nInitiating graceful shutdown...");
     tokio::time::sleep(Duration::from_millis(500)).await;
     let exit_core = Arc::clone(&core);
+
     let mut desc_file = exit_core.desc_file.lock().unwrap();
     desc_file.flush()?;
+
     let mut data_file = exit_core.data_file.lock().unwrap();
     data_file.flush()?;
-    println!("Cleaning finished. Closing...");
+
+    println!("All data flushed to disk");
+    println!("Resources released\nGoodbye! 👋");
     Ok(())
 }
 
@@ -135,6 +150,10 @@ async fn handle_client(socket: TcpStream, core: Arc<Core>) -> Result<(), Box<dyn
 
                 match core.list().await {
                     Ok(list) => {
+                        if list.len() <= 0 {
+                            writer.write_all(b"> No objects\n").await?;
+                            continue;
+                        }
                         for chunk in list.chunks(2) {
                             let line = chunk
                                 .iter()
@@ -170,6 +189,10 @@ async fn handle_client(socket: TcpStream, core: Arc<Core>) -> Result<(), Box<dyn
 
                 match core.list_by_kind(kind_enum).await {
                     Ok(list) => {
+                        if list.len() <= 0 {
+                            writer.write_all(b"> No objects\n").await?;
+                            continue;
+                        }
                         for chunk in list.chunks(2) {
                             let line = chunk
                                 .iter()

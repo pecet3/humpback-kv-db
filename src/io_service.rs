@@ -15,8 +15,7 @@ pub fn update_chunk_in_file(
     let mut file = file.lock().unwrap();
     file.seek(SeekFrom::Start(offset))?;
     let meta = file.metadata()?;
-    println!("{}", meta.len());
-    let t: Vec<u8> = vec![0; 293];
+    println!("meta len {}", meta.len());
     file.write_all(&data)?;
     file.flush()?;
     Ok(())

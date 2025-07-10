@@ -131,7 +131,6 @@ impl ObjectService {
             }
         }
 
-        println!("{}", objects_by_key.clone().len());
         let filtered_objects: Vec<(String, Object)> = objects_by_key
             .into_iter()
             .filter_map(|(key, objects)| {
@@ -142,10 +141,8 @@ impl ObjectService {
                 }
             })
             .collect();
+        let hash_map_len = filtered_objects.len();
 
-        println!("{}", filtered_objects.len());
-
-        // Wrzucanie do mapy
         match self.objects_map.write() {
             Ok(mut map) => {
                 for (key, object) in filtered_objects {
@@ -157,7 +154,10 @@ impl ObjectService {
                 eprintln!("Loading object error: {}", e)
             }
         }
-        println!("Loaded object descriptors");
+        println!(
+            "Loaded object descriptors\nObjects in memory: {}",
+            hash_map_len
+        );
     }
 
     pub fn load_objects_data(&mut self, file: Arc<Mutex<File>>) {
@@ -178,11 +178,21 @@ impl ObjectService {
         }
         println!("Loaded object data");
     }
-    pub fn get(&self, key: &str) -> Option<Vec<u8>> {
+    pub fn get_data(&self, key: &str) -> Option<Vec<u8>> {
         let map = self.objects_map.read();
         match map {
             Ok(map) => match map.get(key) {
                 Some(object) => Some(object.data.clone()),
+                None => None,
+            },
+            Err(_) => None,
+        }
+    }
+    pub fn get_desc(&self, key: &str) -> Option<ObjectDescriptor> {
+        let map = self.objects_map.read();
+        match map {
+            Ok(map) => match map.get(key) {
+                Some(object) => Some(object.desc.clone()),
                 None => None,
             },
             Err(_) => None,
