@@ -6,12 +6,15 @@ use std::{
 };
 
 use crate::{
-    DIR_PATH, io_service as io,
-    object_service::{self, Key256, Kind, Object, ObjectDescriptor, ObjectListElement},
+    DIR_PATH,
+    database::{
+        io_service as io,
+        objects::{self, Key256, Kind, Object, ObjectDescriptor, ObjectListElement},
+    },
 };
 
 pub struct Core {
-    pub objects: object_service::ObjectService,
+    pub objects: objects::ObjectService,
     pub data_file: Arc<Mutex<File>>,
     pub desc_file: Arc<Mutex<File>>,
 }
@@ -42,7 +45,7 @@ impl Core {
             .create(true)
             .open(&desc_file_path)?;
         let mut core = Core {
-            objects: object_service::ObjectService::new(),
+            objects: objects::ObjectService::new(),
             data_file: Arc::new(Mutex::new(data_file)),
             desc_file: Arc::new(Mutex::new(desc_file)),
         };

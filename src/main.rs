@@ -1,7 +1,5 @@
-mod core;
-mod io_service;
-mod object_service;
-use crate::{core::Core, object_service::Kind};
+mod database;
+
 use std::{error::Error, io::Write, str::FromStr, sync::Arc, time::Duration};
 use tokio::{
     io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader},
@@ -9,6 +7,8 @@ use tokio::{
     signal,
     sync::Notify,
 };
+
+use crate::database::{core::Core, objects::Kind};
 
 const DIR_PATH: &str = "./humpback-data";
 
@@ -26,7 +26,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         "#
     );
 
-    let core = core::Core::new().expect("Init error");
+    let core = database::core::Core::new().expect("Init error");
 
     let notify_shutdown = Arc::new(Notify::new());
 

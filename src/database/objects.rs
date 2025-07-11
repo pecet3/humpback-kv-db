@@ -6,7 +6,7 @@ use std::{collections::HashMap, fs::File, str::FromStr, sync::Arc};
 
 use serde::{Deserialize, Serialize};
 
-use crate::io_service;
+use crate::database::io_service;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum Kind {
