@@ -48,7 +48,7 @@ pub async fn run(core: Arc<Core>) -> Result<(), Box<dyn Error>> {
     data_file.flush()?;
 
     println!("All data flushed to disk");
-    println!("Resources released\nGoodbye! 👋");
+    println!("Resources released");
     Ok(())
 }
 

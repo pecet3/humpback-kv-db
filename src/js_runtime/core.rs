@@ -14,8 +14,9 @@ extension!(
     op_read_file,
     op_write_file,
     op_remove_file,
-    op_get_value,
-    op_set_string,
+    op_db_get_value,
+    op_db_set_string,
+    op_http_get,
   ],
  esm_entry_point = "ext:runjs/runtime.js",
  esm = [dir "src/js_runtime", "runtime.js"],
@@ -74,7 +75,7 @@ fn op_remove_file(#[string] path: String) -> Result<(), AnyError> {
 // database
 #[op2]
 #[string]
-fn op_get_value(state: &mut OpState, #[string] key: String) -> Result<Option<String>, AnyError> {
+fn op_db_get_value(state: &mut OpState, #[string] key: String) -> Result<Option<String>, AnyError> {
     let core = state.borrow::<Arc<database::core::Core>>().clone();
     let value = core.get(&key);
 
@@ -85,7 +86,7 @@ fn op_get_value(state: &mut OpState, #[string] key: String) -> Result<Option<Str
 }
 
 #[op2(fast)]
-fn op_set_string(
+fn op_db_set_string(
     state: &mut OpState,
     #[string] key: String,
     #[string] data: String,
@@ -95,4 +96,13 @@ fn op_set_string(
     let data_bytes = data.into_bytes();
     core.set(&key, Kind::String, data_bytes);
     Ok(())
+}
+
+// http
+
+#[op2(async)]
+#[string]
+async fn op_http_get(#[string] url: String) -> Result<String, AnyError> {
+    let body = reqwest::get(url).await?.text().await?;
+    Ok(body)
 }

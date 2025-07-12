@@ -14,7 +14,7 @@ globalThis.console = {
 };
 
 
-globalThis.runjs = {
+globalThis.io = {
    readFile: (path) => {
      return core.ops.op_read_file(path);
    },
@@ -28,9 +28,15 @@ globalThis.runjs = {
 
 globalThis.db = {
   get: (key) => {
-    return core.ops.op_get_value(key);
+    return core.ops.op_db_get_value(key);
   },
   setString: (key, data) => {
-    return core.ops.op_set_string(key, data);
+    return core.ops.op_db_set_string(key, data);
+  },
+};
+
+globalThis.http = {
+  get: (url) => {
+    return core.ops.op_http_get(url);
   },
 };

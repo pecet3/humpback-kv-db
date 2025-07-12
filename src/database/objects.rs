@@ -146,7 +146,6 @@ impl ObjectService {
         match self.objects_map.write() {
             Ok(mut map) => {
                 for (key, object) in filtered_objects {
-                    println!("{}", object.desc.is_deleted);
                     map.insert(key, object);
                 }
             }
