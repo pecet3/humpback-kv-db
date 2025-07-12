@@ -55,10 +55,14 @@ impl Core {
         Ok(Arc::new(core))
     }
 
-    pub async fn get(&self, key: &str) -> Option<Vec<u8>> {
+    pub async fn get_async(&self, key: &str) -> Option<Vec<u8>> {
         return self.objects.get_data(key);
     }
-    pub async fn set(&self, key: &str, kind: Kind, data: Vec<u8>) {
+    pub fn get(&self, key: &str) -> Option<Vec<u8>> {
+        return self.objects.get_data(key);
+    }
+
+    pub async fn set_async(&self, key: &str, kind: Kind, data: Vec<u8>) {
         let data_file = Arc::clone(&self.data_file);
         let desc_file = Arc::clone(&self.desc_file);
         let key_owned = key.to_string();
@@ -103,7 +107,47 @@ impl Core {
 
         self.objects.set(obj).unwrap();
     }
+    pub fn set(&self, key: &str, kind: Kind, data: Vec<u8>) {
+        let data_file = Arc::clone(&self.data_file);
+        let desc_file = Arc::clone(&self.desc_file);
+        let key_owned = key.to_string();
+        let kind_clone = kind.clone();
+        let size = data.len();
+        let data_clone = data.clone();
+        let mut is_existing = true;
+        let mut existing_desc_offset: u64 = 0;
+        match self.objects.get_desc(&key_owned.clone()) {
+            None => {
+                is_existing = false;
+            }
+            Some(desc) => existing_desc_offset = desc.desc_offset,
+        }
 
+        let offset =
+            io::save_object_in_file(&data_clone, data_file).expect("Failed to write data") as u64;
+
+        let mut desc = ObjectDescriptor {
+            key: Key256::new(&key_owned),
+            kind: kind_clone.clone(),
+            offset,
+            size: size as u64,
+            is_deleted: false,
+            desc_offset: 0,
+        };
+
+        let desc_data = bincode::serialize(&desc).unwrap();
+        if is_existing {
+            println!("edo: {}", existing_desc_offset);
+            io::update_chunk_in_file(existing_desc_offset, desc_data, desc_file).unwrap();
+            desc.desc_offset = existing_desc_offset;
+        } else {
+            let desc_offset =
+                io::save_desc_in_file(desc_data, desc_file).expect("Failed to write descriptor");
+            desc.desc_offset = desc_offset;
+        }
+
+        self.objects.set(Object { desc, data }).unwrap();
+    }
     pub async fn delete_soft(&self, key: &str) -> Result<(), Box<dyn Error + Send + Sync>> {
         let mut object = self
             .objects
