@@ -14,29 +14,29 @@ globalThis.console = {
 };
 
 
-globalThis.io = {
-   readFile: (path) => {
-     return core.ops.op_read_file(path);
+globalThis.file = {
+   read: (path) => {
+     return core.ops.file_read(path);
    },
-   writeFile: (path, contents) => {
-     return core.ops.op_write_file(path, contents);
+   write: (path, contents) => {
+     return core.ops.file_write(path, contents);
    },
-   removeFile: (path) => {
-     return core.ops.op_remove_file(path);
+   remove: (path) => {
+     return core.ops.file_remove(path);
   },
 };
 
 globalThis.db = {
   get: (key) => {
-    return core.ops.op_db_get_value(key);
+    return core.ops.db_get_value(key);
   },
   setString: (key, data) => {
-    return core.ops.op_db_set_string(key, data);
+    return core.ops.db_set_string(key, data);
   },
 };
 
 globalThis.http = {
   get: (url) => {
-    return core.ops.op_http_get(url);
+    return core.ops.http_get(url);
   },
 };

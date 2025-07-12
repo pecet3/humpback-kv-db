@@ -5,7 +5,9 @@ interface Foo {
   fizz: number;
 }
 let content: string;
-content = await runjs.fetch(
+content = await http.get(
   "https://deno.land/std@0.177.0/examples/welcome.ts",
 );
 console.log("Content from fetch", content);
+
+export{}

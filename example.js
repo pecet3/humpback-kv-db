@@ -1,16 +1,17 @@
 console.log("Hello", "runjs!");
 console.error("Boom!");
 
+ const path = "./log.txt";
+ try {
+   const contents = await file.read(path);
+   console.log("Read from a file", contents);
+ } catch (err) {
+   console.error("Unable to read file", path, err);
+ }
 
-let value = db.get("test");
-console.log(value);
+ await file.write(path, "I can write to a file....");
+ const contents = await file.read(path);
+ console.log("Read from a file", path, "contents:", contents);
+ console.log("Removing file", path);
 
-// db.setString("test2", "hello world");
-let value2 = db.get("test2");
-console.log(value2);
-
-console.log("Hello", "runjs!");
-const contentt = await http.get(
-  "https://deno.land/std@0.177.0/examples/welcome.ts",
-);
-console.log("Content from fetch", contentt);
+ console.log("File removed");
