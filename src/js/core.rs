@@ -1,12 +1,13 @@
 use deno_core::error::AnyError;
 use deno_core::extension;
+
 use std::rc::Rc;
 use std::sync::Arc;
 
 use crate::database;
-use crate::js_runtime::op_db;
-use crate::js_runtime::op_file;
-use crate::js_runtime::op_http;
+use crate::js::op_db;
+use crate::js::op_file;
+use crate::js::op_http;
 
 extension!(
   runjs,
@@ -19,7 +20,7 @@ extension!(
     op_http::op_http_get,
   ],
  esm_entry_point = "ext:runjs/runtime.js",
- esm = [dir "src/js_runtime", "runtime.js"],
+ esm = [dir "src/js", "runtime.js"],
 );
 
 async fn run_js(file_path: &str, core: Arc<database::core::Core>) -> Result<(), AnyError> {
@@ -42,13 +43,13 @@ async fn run_js(file_path: &str, core: Arc<database::core::Core>) -> Result<(), 
     result.await
 }
 
-pub fn run(core: Arc<database::core::Core>) {
+pub fn execute(core: Arc<database::core::Core>, script_name: &str) {
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
         .unwrap();
-
-    if let Err(error) = runtime.block_on(run_js("./example.js", core)) {
+    let path = format!("./humpback-data/scripts/{}", script_name.to_string());
+    if let Err(error) = runtime.block_on(run_js(&path, core)) {
         eprintln!("error: {}", error);
     }
 }

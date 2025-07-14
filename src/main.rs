@@ -1,6 +1,6 @@
 use std::sync::Arc;
 mod database;
-mod js_runtime;
+mod js;
 mod tcp_service;
 
 const DIR_PATH: &str = "./humpback-data";
@@ -18,8 +18,14 @@ fn main() {
         "#
     );
     let core = database::core::Core::new().expect("Init error");
-    js_runtime::core::run(Arc::clone(&core));
+    let scr = r#"console.log("Hello", "runjs!");
+console.error("Boom!");
 
+const result = db.get("test");
+console.log(result);"#;
+
+    let runtime = js::runtime::Runtime::new(Arc::clone(&core));
+    runtime.execute(scr);
     match tcp_service::run(Arc::clone(&core)) {
         Ok(_) => {}
         Err(e) => {
