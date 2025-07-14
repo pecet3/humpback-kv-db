@@ -1,4 +1,6 @@
 use std::sync::Arc;
+
+use std::sync::Mutex;
 mod database;
 mod js;
 mod tcp_service;
@@ -18,15 +20,20 @@ fn main() {
         "#
     );
     let core = database::core::Core::new().expect("Init error");
-    let scr = r#"console.log("Hello", "runjs!");
-console.error("Boom!");
+    let runtime: Arc<Mutex<js::runtime::Runtime>> =
+        Arc::new(Mutex::new(js::runtime::Runtime::new(Arc::clone(&core))));
 
-const result = db.get("test");
-console.log(result);"#;
+    // Skrypt
+    let scr = r#"
+        console.log("Hello, runjs!");
+    "#;
 
-    let runtime = js::runtime::Runtime::new(Arc::clone(&core));
-    runtime.execute(scr);
-    match tcp_service::run(Arc::clone(&core)) {
+    // Dostęp mutowalny do runtime
+    {
+        let mut rt = runtime.lock().unwrap();
+        rt.execute(scr).expect("Script execution failed");
+    }
+    match tcp_service::run(Arc::clone(&core), Arc::clone(&runtime)) {
         Ok(_) => {}
         Err(e) => {
             println!("{}", e);

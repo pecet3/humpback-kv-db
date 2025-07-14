@@ -12,6 +12,14 @@ globalThis.console = {
     core.print(`[err]: ${argsToMessage(...args)}\n`, true);
   },
 };
+globalThis.konsola = {
+  logowanie: (...args) => {
+    core.print(`[out]: ${argsToMessage(...args)}\n`, false);
+  },
+  error: (...args) => {
+    core.print(`[err]: ${argsToMessage(...args)}\n`, true);
+  },
+};
 
 
 globalThis.file = {

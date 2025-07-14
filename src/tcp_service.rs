@@ -1,4 +1,10 @@
-use std::{error::Error, io::Write, str::FromStr, sync::Arc, time::Duration};
+use std::{
+    error::Error,
+    io::Write,
+    str::FromStr,
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 use tokio::{
     io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader},
     net::{TcpListener, TcpStream},
@@ -6,10 +12,13 @@ use tokio::{
     sync::Notify,
 };
 
-use crate::database::{core::Core, objects::Kind};
+use crate::{
+    database::{core::Core, objects::Kind},
+    js::runtime::Runtime,
+};
 
 #[tokio::main]
-pub async fn run(core: Arc<Core>) -> Result<(), Box<dyn Error>> {
+pub async fn run(core: Arc<Core>, js: Arc<Mutex<Runtime>>) -> Result<(), Box<dyn Error>> {
     let notify_shutdown = Arc::new(Notify::new());
 
     let listener = TcpListener::bind("127.0.0.1:8080").await?;

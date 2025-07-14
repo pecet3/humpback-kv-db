@@ -1,6 +1,6 @@
 use deno_core::error::AnyError;
 use deno_core::extension;
-use std::clone;
+use deno_core::v8;
 use std::rc::Rc;
 use std::sync::Arc;
 
@@ -42,8 +42,8 @@ impl Runtime {
             runtime: js_runtime,
         }
     }
-    pub fn execute(mut self, script: &str) {
+    pub fn execute(&mut self, script: &str) -> Result<v8::Global<v8::Value>, AnyError> {
         let script = script.to_string();
-        self.runtime.execute_script("", script);
+        return self.runtime.execute_script("", script);
     }
 }
