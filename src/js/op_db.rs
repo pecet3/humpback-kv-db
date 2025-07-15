@@ -28,7 +28,6 @@ pub fn db_set_string(
     #[string] data: String,
 ) -> Result<(), AnyError> {
     let core = state.borrow::<Arc<database::core::Core>>().clone();
-
     let data_bytes = data.into_bytes();
     core.set(&key, Kind::String, data_bytes);
     Ok(())

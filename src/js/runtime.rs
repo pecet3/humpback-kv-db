@@ -1,3 +1,5 @@
+use deno_core::JsRuntime;
+use deno_core::RuntimeOptions;
 use deno_core::error::AnyError;
 use deno_core::extension;
 use deno_core::v8;
@@ -34,9 +36,9 @@ pub struct Runtime {
 }
 impl Runtime {
     pub fn new(core: Arc<database::core::Core>) -> Arc<Self> {
-        return Arc::new(Runtime {
+        Arc::new(Runtime {
             tx_execute: spawn_js_runtime(core),
-        });
+        })
     }
     pub fn execute(&self, script: &str) {
         self.tx_execute.send(script.to_string());
@@ -47,24 +49,38 @@ fn spawn_js_runtime(core: Arc<Core>) -> Sender<String> {
     let (tx, rx): (Sender<String>, Receiver<String>) = mpsc::channel();
 
     thread::spawn(move || {
-        let mut js_runtime: deno_core::JsRuntime =
-            deno_core::JsRuntime::new(deno_core::RuntimeOptions {
-                module_loader: Some(Rc::new(deno_core::FsModuleLoader)),
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+
+        rt.block_on(async move {
+            let mut js_runtime = JsRuntime::new(RuntimeOptions {
                 extensions: vec![runjs::init_ops_and_esm()],
                 ..Default::default()
             });
-        {
-            let op_state = js_runtime.op_state();
-            let mut op_state = op_state.borrow_mut();
-            op_state.put::<Arc<database::core::Core>>(core);
-        }
-        for script in rx {
-            match js_runtime.execute_script("", script) {
-                Ok(_) => println!("[JS OK] Script executed"),
-                Err(e) => eprintln!("[JS ERROR] {:?}", e),
+
+            {
+                let op_state = js_runtime.op_state();
+                let mut op_state = op_state.borrow_mut();
+                op_state.put::<Arc<Core>>(core.clone());
             }
-        }
+            while let Ok(script) = rx.recv() {
+                match js_runtime.execute_script("<anon>", script.clone()) {
+                    Ok(_) => {
+                        if let Err(e) = js_runtime.run_event_loop(Default::default()).await {
+                            eprintln!("[JS EVENT LOOP ERROR] {:?}", e);
+                        } else {
+                            println!("[JS OK] Script executed");
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("[JS ERROR] {:?}", e);
+                    }
+                }
+            }
+        });
     });
 
-    return tx;
+    tx
 }

@@ -6,8 +6,8 @@ use axum::{
     Router,
     extract::{Json, State},
     http::StatusCode,
-    response::Json as ResponseJson,
-    routing::post,
+    response::{Html, Json as ResponseJson},
+    routing::{get, post},
 };
 use deno_core::serde_json;
 use serde::{Deserialize, Serialize};
@@ -97,6 +97,7 @@ pub async fn run(core: Arc<Core>) -> Result<(), Box<dyn Error>> {
     };
 
     let app = Router::new()
+        .route("/", get(serve_html))
         .route("/get", post(handle_get))
         .route("/set", post(handle_set))
         .route("/delete", post(handle_delete))
@@ -145,6 +146,10 @@ async fn shutdown_signal() {
 
 fn verify_token(token: &str) -> bool {
     token == AUTH_TOKEN
+}
+
+async fn serve_html() -> Html<&'static str> {
+    Html(include_str!("../index.html"))
 }
 
 fn create_error_response(error: &str) -> (StatusCode, ResponseJson<ErrorResponse>) {

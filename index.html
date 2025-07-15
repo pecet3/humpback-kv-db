@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Humpback KV Database</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+        background-color: #f5f5f5;
+      }
+      .container {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        margin-bottom: 20px;
+      }
+      h1,
+      h2 {
+        color: #333;
+      }
+      .form-group {
+        margin-bottom: 15px;
+      }
+      label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: bold;
+      }
+      input,
+      select,
+      textarea {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        box-sizing: border-box;
+      }
+      textarea {
+        height: 100px;
+        resize: vertical;
+      }
+      button {
+        background-color: #007bff;
+        color: white;
+        padding: 10px 20px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 16px;
+      }
+      button:hover {
+        background-color: #0056b3;
+      }
+      button:disabled {
+        background-color: #ccc;
+        cursor: not-allowed;
+      }
+      .success {
+        color: #28a745;
+        background-color: #d4edda;
+        border: 1px solid #c3e6cb;
+        padding: 10px;
+        border-radius: 4px;
+        margin-top: 10px;
+      }
+      .error {
+        color: #dc3545;
+        background-color: #f8d7da;
+        border: 1px solid #f5c6cb;
+        padding: 10px;
+        border-radius: 4px;
+        margin-top: 10px;
+      }
+      .item-list {
+        max-height: 400px;
+        overflow-y: auto;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+      }
+      .item {
+        padding: 10px;
+        border-bottom: 1px solid #eee;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .item:last-child {
+        border-bottom: none;
+      }
+      .item:hover {
+        background-color: #f8f9fa;
+      }
+      .item-info {
+        flex: 1;
+      }
+      .item-key {
+        font-weight: bold;
+        color: #333;
+      }
+      .item-meta {
+        font-size: 12px;
+        color: #666;
+        margin-top: 3px;
+      }
+      .item-actions {
+        display: flex;
+        gap: 5px;
+      }
+      .btn-small {
+        padding: 4px 8px;
+        font-size: 12px;
+        border-radius: 3px;
+      }
+      .btn-danger {
+        background-color: #dc3545;
+      }
+      .btn-danger:hover {
+        background-color: #c82333;
+      }
+      .btn-info {
+        background-color: #17a2b8;
+      }
+      .btn-info:hover {
+        background-color: #138496;
+      }
+      .loading {
+        text-align: center;
+        padding: 20px;
+        color: #666;
+      }
+      .empty {
+        text-align: center;
+        padding: 20px;
+        color: #666;
+        font-style: italic;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>🐋 Humpback KV Database</h1>
+
+    <div class="container">
+      <h2>Add New Item</h2>
+      <form id="addForm">
+        <div class="form-group">
+          <label for="key">Key:</label>
+          <input type="text" id="key" name="key" required maxlength="256" />
+        </div>
+
+        <div class="form-group">
+          <label for="kind">Type:</label>
+          <select id="kind" name="kind" required>
+            <option value="string">String</option>
+            <option value="number">Number</option>
+            <option value="boolean">Boolean</option>
+            <option value="json">JSON</option>
+            <option value="js">JavaScript</option>
+            <option value="blob">Blob</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="data">Data:</label>
+          <textarea
+            id="data"
+            name="data"
+            required
+            placeholder="Enter your data here..."
+          ></textarea>
+        </div>
+
+        <button type="submit" id="submitBtn">Add Item</button>
+        <div id="message"></div>
+      </form>
+    </div>
+
+    <div class="container">
+      <h2>Database Items</h2>
+      <button onclick="loadItems()" id="refreshBtn">Refresh List</button>
+      <div id="itemsList" class="item-list">
+        <div class="loading">Loading...</div>
+      </div>
+    </div>
+
+    <script>
+      const API_BASE = "http://localhost:8080";
+      const TOKEN = "humpback_secret_token_2024";
+
+      // Load items on page load
+      document.addEventListener("DOMContentLoaded", function () {
+        loadItems();
+      });
+
+      // Add form submission
+      document
+        .getElementById("addForm")
+        .addEventListener("submit", async function (e) {
+          e.preventDefault();
+
+          const submitBtn = document.getElementById("submitBtn");
+          const messageDiv = document.getElementById("message");
+
+          submitBtn.disabled = true;
+          submitBtn.textContent = "Adding...";
+          messageDiv.innerHTML = "";
+
+          const formData = new FormData(e.target);
+          const key = formData.get("key");
+          const kind = formData.get("kind");
+          let data = formData.get("data");
+
+          // Convert data based on type
+          if (kind === "number") {
+            const num = parseFloat(data);
+            if (isNaN(num)) {
+              showMessage("Invalid number format", "error");
+              submitBtn.disabled = false;
+              submitBtn.textContent = "Add Item";
+              return;
+            }
+            data = num.toString();
+          } else if (kind === "boolean") {
+            data = data.toLowerCase();
+            if (data !== "true" && data !== "false") {
+              showMessage('Boolean must be "true" or "false"', "error");
+              submitBtn.disabled = false;
+              submitBtn.textContent = "Add Item";
+              return;
+            }
+          } else if (kind === "json") {
+            try {
+              JSON.parse(data);
+            } catch (e) {
+              showMessage("Invalid JSON format", "error");
+              submitBtn.disabled = false;
+              submitBtn.textContent = "Add Item";
+              return;
+            }
+          }
+
+          try {
+            const response = await fetch(`${API_BASE}/set`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                token: TOKEN,
+                key: key,
+                kind: kind,
+                data: data,
+              }),
+            });
+
+            const result = await response.json();
+
+            if (response.ok && result.status === "success") {
+              showMessage("Item added successfully!", "success");
+              e.target.reset();
+              loadItems();
+            } else {
+              showMessage(result.error || "Failed to add item", "error");
+            }
+          } catch (error) {
+            showMessage("Network error: " + error.message, "error");
+          }
+
+          submitBtn.disabled = false;
+          submitBtn.textContent = "Add Item";
+        });
+
+      function showMessage(message, type) {
+        const messageDiv = document.getElementById("message");
+        messageDiv.innerHTML = `<div class="${type}">${message}</div>`;
+        setTimeout(() => {
+          messageDiv.innerHTML = "";
+        }, 5000);
+      }
+
+      async function loadItems() {
+        const itemsList = document.getElementById("itemsList");
+        const refreshBtn = document.getElementById("refreshBtn");
+
+        refreshBtn.disabled = true;
+        refreshBtn.textContent = "Loading...";
+        itemsList.innerHTML = '<div class="loading">Loading...</div>';
+
+        try {
+          const response = await fetch(`${API_BASE}/list`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              token: TOKEN,
+            }),
+          });
+
+          const result = await response.json();
+
+          if (response.ok && result.status === "success") {
+            displayItems(result.data || []);
+          } else {
+            itemsList.innerHTML = `<div class="error">Failed to load items: ${result.error}</div>`;
+          }
+        } catch (error) {
+          itemsList.innerHTML = `<div class="error">Network error: ${error.message}</div>`;
+        }
+
+        refreshBtn.disabled = false;
+        refreshBtn.textContent = "Refresh List";
+      }
+
+      function displayItems(items) {
+        const itemsList = document.getElementById("itemsList");
+
+        if (items.length === 0) {
+          itemsList.innerHTML = '<div class="empty">No items in database</div>';
+          return;
+        }
+
+        const itemsHtml = items
+          .map((item) => {
+            const escapedKey = escapeHtml(item.key);
+            return `
+      <div class="item">
+        <div class="item-info">
+          <div class="item-key">${escapedKey}</div>
+          <div class="item-meta">
+            Type: ${item.kind.toUpperCase()} | Size: ${item.size} bytes
+          </div>
+        </div>
+        <div class="item-actions">
+          <button class="btn-small btn-info" onclick="viewItem('${escapedKey}')">View</button>
+          <button class="btn-small btn-danger" onclick="deleteItem('${escapedKey}')">Delete</button>
+          ${
+            item.kind === "js"
+              ? `<button class="btn-small btn-success" onclick="executeScript('${escapedKey}')">Execute</button>`
+              : ""
+          }
+        </div>
+      </div>
+    `;
+          })
+          .join("");
+
+        itemsList.innerHTML = itemsHtml;
+      }
+      console.log(1);
+      async function executeScript(key) {
+        try {
+          const response = await fetch(`${API_BASE}/exec`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              token: TOKEN,
+              key: key,
+            }),
+          });
+
+          const result = await response.json();
+
+          if (response.ok && result.status === "success") {
+            alert(
+              `Script executed successfully.\nOutput:\n${
+                result.output || "(no output)"
+              }`
+            );
+          } else {
+            alert(`Failed to execute script: ${result.error}`);
+          }
+        } catch (error) {
+          alert(`Network error: ${error.message}`);
+        }
+      }
+
+      async function viewItem(key) {
+        try {
+          const response = await fetch(`${API_BASE}/get`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              token: TOKEN,
+              key: key,
+            }),
+          });
+
+          const result = await response.json();
+
+          if (response.ok && result.status === "success") {
+            const data =
+              typeof result.data === "object"
+                ? JSON.stringify(result.data, null, 2)
+                : result.data;
+            alert(`Key: ${key}\nData: ${data}`);
+          } else {
+            alert(`Failed to get item: ${result.error}`);
+          }
+        } catch (error) {
+          alert(`Network error: ${error.message}`);
+        }
+      }
+
+      async function deleteItem(key) {
+        if (!confirm(`Are you sure you want to delete "${key}"?`)) {
+          return;
+        }
+
+        try {
+          const response = await fetch(`${API_BASE}/delete`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              token: TOKEN,
+              key: key,
+            }),
+          });
+
+          const result = await response.json();
+
+          if (response.ok && result.status === "success") {
+            showMessage("Item deleted successfully!", "success");
+            loadItems();
+          } else {
+            showMessage(`Failed to delete item: ${result.error}`, "error");
+          }
+        } catch (error) {
+          showMessage(`Network error: ${error.message}`, "error");
+        }
+      }
+
+      function escapeHtml(text) {
+        const div = document.createElement("div");
+        div.textContent = text;
+        return div.innerHTML;
+      }
+    </script>
+  </body>
+</html>

@@ -28,7 +28,7 @@ impl FromStr for Kind {
             "boolean" => Ok(Kind::Boolean),
             "string" => Ok(Kind::String),
             "json" => Ok(Kind::Json),
-            "blob" => Ok(Kind::Blob), // Changed "Blob" to "blob" for consistency with to_lowercase()
+            "blob" => Ok(Kind::Blob),
             "object" => Ok(Kind::Object),
             "js" => Ok(Kind::Js),
             _ => Err(()),
@@ -43,9 +43,9 @@ impl fmt::Display for Kind {
             Kind::Boolean => "boolean",
             Kind::String => "string",
             Kind::Json => "json",
-            Kind::Blob => "Blob",
-            Kind::Object => "Object",
-            Kind::Js => "Js",
+            Kind::Blob => "blob",
+            Kind::Object => "object",
+            Kind::Js => "js",
         };
         write!(f, "{}", s)
     }
