@@ -1,6 +1,6 @@
 use crate::{
     database::{core::Core, objects::Kind},
-    js::runtime::{Runtime, spawn_js_runtime},
+    js::{self, runtime::Runtime},
 };
 use std::{
     error::Error,
@@ -32,15 +32,15 @@ pub async fn run(core: Arc<Core>) -> Result<(), Box<dyn Error>> {
         signal::ctrl_c().await.expect("Failed to listen ctrl+c");
         shutdown_notify.notify_waiters();
     });
-    let js_sender = spawn_js_runtime(Arc::clone(&core));
+    let runtime: Arc<Runtime> = js::runtime::Runtime::new(Arc::clone(&core));
     loop {
         tokio::select! {
             Ok((socket, addr)) = listener.accept() => {
                 println!("New connection from: {}", addr);
                 let core = Arc::clone(&core);
-                let sender = Arc::clone(&js_sender);
+                let runtime = Arc::clone(&runtime);
                 tokio::spawn(async move {
-                    if let Err(e) = handle_client(socket, core,sender).await {
+                    if let Err(e) = handle_client(socket, core,runtime).await {
                         eprintln!("Connection error: {}", e);
                     }
                 });
@@ -68,7 +68,7 @@ pub async fn run(core: Arc<Core>) -> Result<(), Box<dyn Error>> {
 async fn handle_client(
     socket: TcpStream,
     core: Arc<Core>,
-    js_sender: Arc<Sender<String>>,
+    runtime: Arc<Runtime>,
 ) -> Result<(), Box<dyn Error>> {
     let (reader, mut writer) = socket.into_split();
     let mut buf_reader = BufReader::new(reader);
@@ -85,14 +85,23 @@ async fn handle_client(
         match parts.as_slice() {
             ["GET", key] => {
                 let start = std::time::Instant::now();
-                let data = core.get_async(key).await;
+                let object = core.get_async(key).await;
                 let duration = start.elapsed();
                 println!("GET completed in {:.2?}", duration);
-                match data {
-                    Some(data) => {
+                match object {
+                    Some(object) => {
                         writer.write_all(b"> SUCCESS\n").await?;
-                        writer.write_all(&data).await?;
-                        writer.write_all(b"\n").await?;
+                        match object.desc.kind {
+                            Kind::Number => {
+                                let mut arr = [0u8; 8];
+                                arr.copy_from_slice(&object.data[..8]);
+                                let number = f64::from_le_bytes(arr);
+                                writer.write_all(format!("{}\n", number).as_bytes()).await?;
+                            }
+                            _ => {
+                                writer.write_all(&object.data).await?;
+                            }
+                        }
                     }
                     None => {
                         writer.write_all(b"> NOT FOUND\n").await?;
@@ -211,14 +220,11 @@ async fn handle_client(
                 println!("LIST completed in {:.2?}", duration);
             }
             ["EXEC", key] => {
-                let start = std::time::Instant::now();
-                let data = core.get_async(key).await;
-                let duration = start.elapsed();
-                println!("EXEC completed in {:.2?}", duration);
-                match data {
-                    Some(data) => {
-                        let script = match String::from_utf8(data) {
-                            Ok(s) => js_sender.send(s),
+                let object = core.get_async(key).await;
+                match object {
+                    Some(object) => {
+                        let _ = match String::from_utf8(object.data) {
+                            Ok(s) => runtime.execute(&s),
                             Err(_) => {
                                 writer.write_all(b"> INVALID UTF-8\n").await?;
                                 continue;

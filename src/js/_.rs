@@ -17,6 +17,7 @@ extension!(
     op_file::file_remove,
     op_db::db_get_value,
     op_db::db_set_string,
+    op_db::db_set_number,
     op_http::op_http_get,
   ],
  esm_entry_point = "ext:runjs/runtime.js",
@@ -39,7 +40,6 @@ async fn run_js(file_path: &str, core: Arc<database::core::Core>) -> Result<(), 
     let mod_id = js_runtime.load_main_es_module(&main_module).await?;
     let result = js_runtime.mod_evaluate(mod_id);
     js_runtime.run_event_loop(Default::default()).await?;
-
     result.await
 }
 

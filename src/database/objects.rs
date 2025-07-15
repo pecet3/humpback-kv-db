@@ -205,6 +205,16 @@ impl ObjectService {
             Err(_) => None,
         }
     }
+    pub fn get_object(&self, key: &str) -> Option<Object> {
+        let map = self.objects_map.read();
+        match map {
+            Ok(map) => match map.get(key) {
+                Some(object) => Some(object.clone()),
+                None => None,
+            },
+            Err(_) => None,
+        }
+    }
     pub fn set(&self, object: Object) -> Result<(), Box<dyn Error>> {
         match self.objects_map.write() {
             Ok(mut map) => {

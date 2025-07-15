@@ -1,0 +1,199 @@
+### Humpback KV Database API Tests
+### Base URL
+@baseUrl = http://localhost:8080
+@token = humpback_secret_token_2024
+
+### 1. set - Store a string
+POST {{baseUrl}}/set
+Content-Type: application/json
+
+{
+  "token": "{{token}}",
+  "key": "greeting",
+  "kind": "string",
+  "data": "Hello World!"
+}
+
+### 2. set - Store a number
+POST {{baseUrl}}/set
+Content-Type: application/json
+
+{
+  "token": "{{token}}",
+  "key": "test",
+  "kind": "number",
+  "data": "42.5"
+}
+
+### 3. set - Store a boolean
+POST {{baseUrl}}/set
+Content-Type: application/json
+
+{
+  "token": "{{token}}",
+  "key": "is_active",
+  "kind": "boolean",
+  "data": "true"
+}
+
+### 4. set - Store JSON
+POST {{baseUrl}}/set
+Content-Type: application/json
+
+{
+  "token": "{{token}}",
+  "key": "user_data",
+  "kind": "json",
+  "data": "{\"name\": \"John\", \"age\": 30, \"city\": \"Warsaw\"}"
+}
+
+### 5. set - Store JavaScript code
+POST {{baseUrl}}/set
+Content-Type: application/json
+
+{
+  "token": "{{token}}",
+  "key": "my_script",
+  "kind": "js",
+  "data": "console.log('Hello from Humpback JS!');"
+}
+
+### 6. GET - Retrieve string
+POST {{baseUrl}}/get
+Content-Type: application/json
+
+{
+  "token": "{{token}}",
+  "key": "test"
+}
+
+### 7. GET - Retrieve number
+POST {{baseUrl}}/get
+Content-Type: application/json
+
+{
+  "token": "{{token}}",
+  "key": "counter"
+}
+
+### 8. GET - Retrieve boolean
+POST {{baseUrl}}/get
+Content-Type: application/json
+
+{
+  "token": "{{token}}",
+  "key": "is_active"
+}
+
+### 9. GET - Retrieve JSON
+POST {{baseUrl}}/get
+Content-Type: application/json
+
+{
+  "token": "{{token}}",
+  "key": "user_data"
+}
+
+### 10. GET - Try to get non-existent key
+POST {{baseUrl}}/get
+Content-Type: application/json
+
+{
+  "token": "{{token}}",
+  "key": "non_existent"
+}
+
+### 11. LIST - Get all objects
+POST {{baseUrl}}/list
+Content-Type: application/json
+
+{
+  "token": "{{token}}"
+}
+
+### 12. LIST_TYPE - Get objects by type (string)
+POST {{baseUrl}}/list_type
+Content-Type: application/json
+
+{
+  "token": "{{token}}",
+  "kind": "string"
+}
+
+### 13. LIST_TYPE - Get objects by type (number)
+POST {{baseUrl}}/list_type
+Content-Type: application/json
+
+{
+  "token": "{{token}}",
+  "kind": "number"
+}
+
+### 14. exec - execute JavaScript code
+POST {{baseUrl}}/exec
+Content-Type: application/json
+
+{
+  "token": "{{token}}",
+  "key": "my_script"
+}
+
+### 15. DELETE - Remove an object
+POST {{baseUrl}}/delete
+Content-Type: application/json
+
+{
+  "token": "{{token}}",
+  "key": "greeting"
+}
+
+### 16. GET - Try to get deleted object
+POST {{baseUrl}}/get
+Content-Type: application/json
+
+{
+  "token": "{{token}}",
+  "key": "greeting"
+}
+
+### 17. Error test - Invalid token
+POST {{baseUrl}}/get
+Content-Type: application/json
+
+{
+  "token": "invalid_token",
+  "key": "counter"
+}
+
+### 18. Error test - Invalid kind
+POST {{baseUrl}}/set
+Content-Type: application/json
+
+{
+  "token": "{{token}}",
+  "key": "test",
+  "kind": "invalid_kind",
+  "data": "test"
+}
+
+### 19. Error test - Key too long
+POST {{baseUrl}}/set
+Content-Type: application/json
+
+{
+  "token": "{{token}}",
+  "key": "this_is_a_very_long_key_that_exceeds_256_characters_and_should_be_rejected_by_the_server_because_it_is_too_long_and_the_maximum_allowed_length_is_256_characters_but_this_key_is_much_longer_than_that_limit_so_it_should_return_an_error_message_indicating_that_the_key_is_too_long_and_cannot_be_processed_by_the_database_system",
+  "kind": "string",
+  "data": "test"
+}
+
+### 20. Error test - Invalid number format
+POST {{baseUrl}}/set
+Content-Type: application/json
+
+{
+  "token": "{{token}}",
+  "key": "bad_number",
+  "kind": "number",
+  "data": "not_a_number"
+}

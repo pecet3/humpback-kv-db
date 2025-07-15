@@ -55,14 +55,32 @@ impl Core {
         Ok(Arc::new(core))
     }
 
-    pub async fn get_async(&self, key: &str) -> Option<Vec<u8>> {
-        return self.objects.get_data(key);
+    pub async fn get_async(&self, key: &str) -> Option<Object> {
+        return self.objects.get_object(key);
     }
-    pub fn get(&self, key: &str) -> Option<Vec<u8>> {
-        return self.objects.get_data(key);
+    pub fn get(&self, key: &str) -> Option<Object> {
+        return self.objects.get_object(key);
     }
 
-    pub async fn set_async(&self, key: &str, kind: Kind, data: Vec<u8>) {
+    pub async fn set_async(&self, key: &str, kind: Kind, mut data: Vec<u8>) {
+        match kind {
+            Kind::Number => {
+                if data.len() < 8 {
+                    data.resize(8, 0);
+                } else if data.len() > 8 {
+                    data.truncate(8);
+                }
+                let mut arr = [0u8; 8];
+                arr.copy_from_slice(&data);
+                let number = f64::from_le_bytes(arr);
+                if !number.is_finite() {
+                    eprintln!("Invalid number")
+                }
+                println!("{}", number);
+                data = number.to_le_bytes().to_vec();
+            }
+            _ => {}
+        }
         let data_file = Arc::clone(&self.data_file);
         let desc_file = Arc::clone(&self.desc_file);
         let key_owned = key.to_string();
@@ -96,7 +114,25 @@ impl Core {
 
         self.objects.set(obj).unwrap();
     }
-    pub fn set(&self, key: &str, kind: Kind, data: Vec<u8>) {
+    pub fn set(&self, key: &str, kind: Kind, mut data: Vec<u8>) {
+        match kind {
+            Kind::Number => {
+                if data.len() < 8 {
+                    data.resize(8, 0);
+                } else if data.len() > 8 {
+                    data.truncate(8);
+                }
+                let mut arr = [0u8; 8];
+                arr.copy_from_slice(&data);
+                let number = f64::from_le_bytes(arr);
+                if !number.is_finite() {
+                    eprintln!("Invalid number")
+                }
+                println!("{}", number);
+                data = number.to_le_bytes().to_vec();
+            }
+            _ => {}
+        }
         let data_file = Arc::clone(&self.data_file);
         let desc_file = Arc::clone(&self.desc_file);
         let key_owned = key.to_string();

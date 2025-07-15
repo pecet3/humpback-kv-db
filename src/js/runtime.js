@@ -38,8 +38,14 @@ globalThis.db = {
   get: (key) => {
     return core.ops.db_get_value(key);
   },
-  setString: (key, data) => {
-    return core.ops.db_set_string(key, data);
+  set: (key, data) => {
+    const type = typeof (data);
+    if (type === "string") {
+      return core.ops.db_set_string(key, data);
+    }
+    if (type === "number") {
+      return core.ops.db_set_number(key, data);
+    }
   },
 };
 
