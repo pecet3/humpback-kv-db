@@ -16,3 +16,4 @@ axum = "0.7"
 tower = "0.4"
 tower-http = { version = "0.5", features = ["cors", "trace"] }
 tracing = "0.1"
+rusqlite = { version = "0.30", features = ["bundled"] }

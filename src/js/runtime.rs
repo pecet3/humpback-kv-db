@@ -6,11 +6,11 @@ use deno_core::v8;
 use std::rc::Rc;
 use std::sync::Arc;
 
-use crate::database;
 use crate::js::op_db;
 use crate::js::op_file;
 use crate::js::op_http;
-use database::core::Core;
+use crate::kv;
+use kv::core::Core;
 use std::{
     sync::mpsc::{self, Receiver, Sender},
     thread,
@@ -35,7 +35,7 @@ pub struct Runtime {
     tx_execute: Sender<String>,
 }
 impl Runtime {
-    pub fn new(core: Arc<database::core::Core>) -> Arc<Self> {
+    pub fn new(core: Arc<kv::core::Core>) -> Arc<Self> {
         Arc::new(Runtime {
             tx_execute: spawn_js_runtime(core),
         })

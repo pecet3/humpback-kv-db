@@ -1,10 +1,11 @@
 use std::sync::Arc;
 
-use std::sync::Mutex;
-mod database;
 mod http_service;
 mod js;
+mod kv;
+mod sql;
 mod tcp_service;
+
 const DIR_PATH: &str = "./humpback-data";
 
 fn main() {
@@ -19,7 +20,7 @@ fn main() {
         ────────────────────────────────────────────
         "#
     );
-    let core = database::core::Core::new().expect("Init error");
+    let core = kv::core::Core::new().expect("Init error");
 
     match http_service::run(Arc::clone(&core)) {
         Ok(_) => {}

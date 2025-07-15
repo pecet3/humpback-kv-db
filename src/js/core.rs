@@ -4,10 +4,10 @@ use deno_core::extension;
 use std::rc::Rc;
 use std::sync::Arc;
 
-use crate::database;
 use crate::js::op_db;
 use crate::js::op_file;
 use crate::js::op_http;
+use crate::kv;
 
 extension!(
   runjs,
@@ -24,7 +24,7 @@ extension!(
  esm = [dir "src/js", "runtime.js"],
 );
 
-async fn run_js(file_path: &str, core: Arc<database::core::Core>) -> Result<(), AnyError> {
+async fn run_js(file_path: &str, core: Arc<kv::core::Core>) -> Result<(), AnyError> {
     let main_module = deno_core::resolve_path(file_path, &std::env::current_dir()?)?;
     let mut js_runtime = deno_core::JsRuntime::new(deno_core::RuntimeOptions {
         module_loader: Some(Rc::new(deno_core::FsModuleLoader)),
@@ -34,7 +34,7 @@ async fn run_js(file_path: &str, core: Arc<database::core::Core>) -> Result<(), 
     {
         let op_state = js_runtime.op_state();
         let mut op_state = op_state.borrow_mut();
-        op_state.put::<Arc<database::core::Core>>(core);
+        op_state.put::<Arc<kv::core::Core>>(core);
     }
 
     let mod_id = js_runtime.load_main_es_module(&main_module).await?;
@@ -43,7 +43,7 @@ async fn run_js(file_path: &str, core: Arc<database::core::Core>) -> Result<(), 
     result.await
 }
 
-pub fn execute(core: Arc<database::core::Core>, script_name: &str) {
+pub fn execute(core: Arc<kv::core::Core>, script_name: &str) {
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()

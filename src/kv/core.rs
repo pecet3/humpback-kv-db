@@ -7,7 +7,7 @@ use std::{
 
 use crate::{
     DIR_PATH,
-    database::{
+    kv::{
         io_service as io,
         objects::{self, Key256, Kind, Object, ObjectDescriptor, ObjectListElement},
     },
