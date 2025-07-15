@@ -24,16 +24,16 @@ fn main() {
         Arc::new(Mutex::new(js::runtime::Runtime::new(Arc::clone(&core))));
 
     // Skrypt
-    let scr = r#"
-        console.log("Hello, runjs!");
-    "#;
+    // let scr = r#"
+    //     console.log("Hello, runjs!");
+    // "#;
 
-    // Dostęp mutowalny do runtime
-    {
-        let mut rt = runtime.lock().unwrap();
-        rt.execute(scr).expect("Script execution failed");
-    }
-    match tcp_service::run(Arc::clone(&core), Arc::clone(&runtime)) {
+    // // Dostęp mutowalny do runtime
+    // {
+    //     let mut rt = runtime.lock().unwrap();
+    //     rt.execute(scr).expect("Script execution failed");
+    // }
+    match tcp_service::run(Arc::clone(&core)) {
         Ok(_) => {}
         Err(e) => {
             println!("{}", e);

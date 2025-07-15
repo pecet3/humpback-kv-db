@@ -1,9 +1,17 @@
+use crate::{
+    database::{core::Core, objects::Kind},
+    js::runtime::{Runtime, spawn_js_runtime},
+};
 use std::{
     error::Error,
     io::Write,
     str::FromStr,
     sync::{Arc, Mutex},
     time::Duration,
+};
+use std::{
+    sync::mpsc::{self, Receiver, Sender},
+    thread,
 };
 use tokio::{
     io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader},
@@ -12,13 +20,8 @@ use tokio::{
     sync::Notify,
 };
 
-use crate::{
-    database::{core::Core, objects::Kind},
-    js::runtime::Runtime,
-};
-
 #[tokio::main]
-pub async fn run(core: Arc<Core>, js: Arc<Mutex<Runtime>>) -> Result<(), Box<dyn Error>> {
+pub async fn run(core: Arc<Core>) -> Result<(), Box<dyn Error>> {
     let notify_shutdown = Arc::new(Notify::new());
 
     let listener = TcpListener::bind("127.0.0.1:8080").await?;
@@ -29,14 +32,15 @@ pub async fn run(core: Arc<Core>, js: Arc<Mutex<Runtime>>) -> Result<(), Box<dyn
         signal::ctrl_c().await.expect("Failed to listen ctrl+c");
         shutdown_notify.notify_waiters();
     });
-
+    let js_sender = spawn_js_runtime(Arc::clone(&core));
     loop {
         tokio::select! {
             Ok((socket, addr)) = listener.accept() => {
                 println!("New connection from: {}", addr);
                 let core = Arc::clone(&core);
+                let sender = Arc::clone(&js_sender);
                 tokio::spawn(async move {
-                    if let Err(e) = handle_client(socket, core).await {
+                    if let Err(e) = handle_client(socket, core,sender).await {
                         eprintln!("Connection error: {}", e);
                     }
                 });
@@ -61,7 +65,11 @@ pub async fn run(core: Arc<Core>, js: Arc<Mutex<Runtime>>) -> Result<(), Box<dyn
     Ok(())
 }
 
-async fn handle_client(socket: TcpStream, core: Arc<Core>) -> Result<(), Box<dyn Error>> {
+async fn handle_client(
+    socket: TcpStream,
+    core: Arc<Core>,
+    js_sender: Arc<Sender<String>>,
+) -> Result<(), Box<dyn Error>> {
     let (reader, mut writer) = socket.into_split();
     let mut buf_reader = BufReader::new(reader);
     let mut line = String::new();
@@ -123,9 +131,11 @@ async fn handle_client(socket: TcpStream, core: Arc<Core>) -> Result<(), Box<dyn
                 let buf_size = match kind {
                     Kind::Number => 16,
                     Kind::Boolean => 4,
-                    Kind::String => 1024 * 16,    // 16 KB
-                    Kind::Json => 1024 * 64,      // 64 KB
-                    Kind::Blob => 1024 * 256 * 4, // 1 Mb
+                    Kind::String => 1024 * 16,      // 16 KB
+                    Kind::Json => 1024 * 64,        // 64 KB
+                    Kind::Blob => 1024 * 1024 * 20, // 20 Mb
+                    Kind::Object => 1024 * 64,
+                    Kind::Js => 1024 * 64,
                 };
                 let mut data_buf = vec![0; buf_size];
                 let data_size = buf_reader.read(&mut data_buf).await?;
@@ -199,6 +209,26 @@ async fn handle_client(socket: TcpStream, core: Arc<Core>) -> Result<(), Box<dyn
                 }
                 let duration = start.elapsed();
                 println!("LIST completed in {:.2?}", duration);
+            }
+            ["EXEC", key] => {
+                let start = std::time::Instant::now();
+                let data = core.get_async(key).await;
+                let duration = start.elapsed();
+                println!("EXEC completed in {:.2?}", duration);
+                match data {
+                    Some(data) => {
+                        let script = match String::from_utf8(data) {
+                            Ok(s) => js_sender.send(s),
+                            Err(_) => {
+                                writer.write_all(b"> INVALID UTF-8\n").await?;
+                                continue;
+                            }
+                        };
+                    }
+                    None => {
+                        writer.write_all(b"> NOT FOUND\n").await?;
+                    }
+                }
             }
             _ => {
                 writer

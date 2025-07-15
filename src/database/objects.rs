@@ -15,7 +15,10 @@ pub enum Kind {
     String,
     Json,
     Blob,
+    Object,
+    Js,
 }
+
 impl FromStr for Kind {
     type Err = ();
 
@@ -25,11 +28,14 @@ impl FromStr for Kind {
             "boolean" => Ok(Kind::Boolean),
             "string" => Ok(Kind::String),
             "json" => Ok(Kind::Json),
-            "Blob" => Ok(Kind::Blob),
+            "blob" => Ok(Kind::Blob), // Changed "Blob" to "blob" for consistency with to_lowercase()
+            "object" => Ok(Kind::Object),
+            "js" => Ok(Kind::Js),
             _ => Err(()),
         }
     }
 }
+
 impl fmt::Display for Kind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = match self {
@@ -38,6 +44,8 @@ impl fmt::Display for Kind {
             Kind::String => "string",
             Kind::Json => "json",
             Kind::Blob => "Blob",
+            Kind::Object => "Object",
+            Kind::Js => "Js",
         };
         write!(f, "{}", s)
     }

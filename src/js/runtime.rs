@@ -8,6 +8,11 @@ use crate::database;
 use crate::js::op_db;
 use crate::js::op_file;
 use crate::js::op_http;
+use database::core::Core;
+use std::{
+    sync::mpsc::{self, Receiver, Sender},
+    thread,
+};
 
 extension!(
   runjs,
@@ -22,6 +27,7 @@ extension!(
  esm_entry_point = "ext:runjs/runtime.js",
  esm = [dir "src/js", "runtime.js"],
 );
+
 pub struct Runtime {
     runtime: deno_core::JsRuntime,
 }
@@ -46,4 +52,20 @@ impl Runtime {
         let script = script.to_string();
         return self.runtime.execute_script("", script);
     }
+}
+
+pub fn spawn_js_runtime(core: Arc<Core>) -> Arc<Sender<String>> {
+    let (tx, rx): (Sender<String>, Receiver<String>) = mpsc::channel();
+
+    thread::spawn(move || {
+        let mut runtime = Runtime::new(core);
+        for script in rx {
+            match runtime.execute(&script) {
+                Ok(_) => println!("[JS OK] Script executed"),
+                Err(e) => eprintln!("[JS ERROR] {:?}", e),
+            }
+        }
+    });
+
+    return Arc::new(tx);
 }
