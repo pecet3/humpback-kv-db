@@ -128,6 +128,12 @@
       .btn-info:hover {
         background-color: #138496;
       }
+      .btn-success {
+        background-color: #28a745;
+      }
+      .btn-success:hover {
+        background-color: #218838;
+      }
       .loading {
         text-align: center;
         padding: 20px;
@@ -138,6 +144,11 @@
         padding: 20px;
         color: #666;
         font-style: italic;
+      }
+      .exec-textarea {
+        height: 150px;
+        font-family: "Courier New", monospace;
+        font-size: 14px;
       }
     </style>
   </head>
@@ -176,6 +187,25 @@
 
         <button type="submit" id="submitBtn">Add Item</button>
         <div id="message"></div>
+      </form>
+    </div>
+
+    <div class="container">
+      <h2>Execute Code Directly</h2>
+      <form id="execForm">
+        <div class="form-group">
+          <label for="execCode">JavaScript Code:</label>
+          <textarea
+            id="execCode"
+            name="execCode"
+            required
+            class="exec-textarea"
+            placeholder="Enter JavaScript code to execute..."
+          ></textarea>
+        </div>
+
+        <button type="submit" id="execSubmitBtn">Execute Code</button>
+        <div id="execMessage"></div>
       </form>
     </div>
 
@@ -274,9 +304,72 @@
           submitBtn.textContent = "Add Item";
         });
 
+      // Execute code form submission
+      document
+        .getElementById("execForm")
+        .addEventListener("submit", async function (e) {
+          e.preventDefault();
+
+          const execSubmitBtn = document.getElementById("execSubmitBtn");
+          const execMessageDiv = document.getElementById("execMessage");
+
+          execSubmitBtn.disabled = true;
+          execSubmitBtn.textContent = "Executing...";
+          execMessageDiv.innerHTML = "";
+
+          const formData = new FormData(e.target);
+          const code = formData.get("execCode");
+
+          try {
+            const response = await fetch(`${API_BASE}/execNow`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                token: TOKEN,
+                code: code,
+              }),
+            });
+
+            const result = await response.json();
+
+            if (response.ok && result.status === "success") {
+              showExecMessage(
+                `Code executed successfully!\nOutput:\n${
+                  result.output || "(no output)"
+                }`,
+                "success"
+              );
+            } else {
+              showExecMessage(
+                `Failed to execute code: ${result.error}`,
+                "error"
+              );
+            }
+          } catch (error) {
+            showExecMessage(`Network error: ${error.message}`, "error");
+          }
+
+          execSubmitBtn.disabled = false;
+          execSubmitBtn.textContent = "Execute Code";
+        });
+
+      function showExecMessage(message, type) {
+        const execMessageDiv = document.getElementById("execMessage");
+        execMessageDiv.innerHTML = `<div class="${type}" style="white-space: pre-wrap;">${escapeHtml(
+          message
+        )}</div>`;
+        setTimeout(() => {
+          execMessageDiv.innerHTML = "";
+        }, 10000);
+      }
+
       function showMessage(message, type) {
         const messageDiv = document.getElementById("message");
-        messageDiv.innerHTML = `<div class="${type}">${message}</div>`;
+        messageDiv.innerHTML = `<div class="${type}">${escapeHtml(
+          message
+        )}</div>`;
         setTimeout(() => {
           messageDiv.innerHTML = "";
         }, 5000);
@@ -306,10 +399,14 @@
           if (response.ok && result.status === "success") {
             displayItems(result.data || []);
           } else {
-            itemsList.innerHTML = `<div class="error">Failed to load items: ${result.error}</div>`;
+            itemsList.innerHTML = `<div class="error">Failed to load items: ${escapeHtml(
+              result.error
+            )}</div>`;
           }
         } catch (error) {
-          itemsList.innerHTML = `<div class="error">Network error: ${error.message}</div>`;
+          itemsList.innerHTML = `<div class="error">Network error: ${escapeHtml(
+            error.message
+          )}</div>`;
         }
 
         refreshBtn.disabled = false;
@@ -327,6 +424,7 @@
         const itemsHtml = items
           .map((item) => {
             const escapedKey = escapeHtml(item.key);
+            const safeKey = item.key.replace(/'/g, "\\'");
             return `
       <div class="item">
         <div class="item-info">
@@ -336,11 +434,11 @@
           </div>
         </div>
         <div class="item-actions">
-          <button class="btn-small btn-info" onclick="viewItem('${escapedKey}')">View</button>
-          <button class="btn-small btn-danger" onclick="deleteItem('${escapedKey}')">Delete</button>
+          <button class="btn-small btn-info" onclick="viewItem('${safeKey}')">View</button>
+          <button class="btn-small btn-danger" onclick="deleteItem('${safeKey}')">Delete</button>
           ${
             item.kind === "js"
-              ? `<button class="btn-small btn-success" onclick="executeScript('${escapedKey}')">Execute</button>`
+              ? `<button class="btn-small btn-success" onclick="executeScript('${safeKey}')">Execute</button>`
               : ""
           }
         </div>
@@ -351,7 +449,7 @@
 
         itemsList.innerHTML = itemsHtml;
       }
-      console.log(1);
+
       async function executeScript(key) {
         try {
           const response = await fetch(`${API_BASE}/exec`, {

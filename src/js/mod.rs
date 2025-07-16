@@ -1,3 +1,4 @@
+pub mod event;
 mod op_event;
 mod op_file;
 mod op_http;

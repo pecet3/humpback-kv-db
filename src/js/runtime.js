@@ -13,26 +13,24 @@ globalThis.console = {
   },
 };
 
-
-
 globalThis.file = {
-   read: (path) => {
-     return core.ops.op_file_read(path);
-   },
-   write: (path, contents) => {
-     return core.ops.op_file_write(path, contents);
-   },
-   remove: (path) => {
-     return core.ops.op_file_remove(path);
+  read: (path) => {
+    return core.ops.op_file_read(path);
+  },
+  write: (path, contents) => {
+    return core.ops.op_file_write(path, contents);
+  },
+  remove: (path) => {
+    return core.ops.op_file_remove(path);
   },
 };
 
-globalThis.db = {
+globalThis.kv = {
   get: (key) => {
     return core.ops.op_kv_get_value(key);
   },
   set: (key, data) => {
-    const type = typeof (data);
+    const type = typeof data;
     core.print(type);
     if (type === "string") {
       return core.ops.op_kv_set_string(key, data);
@@ -52,5 +50,8 @@ globalThis.http = {
 globalThis._event = {
   next: () => {
     return core.ops.op_event_next();
+  },
+  return: (id, result) => {
+    return core.ops.op_event_return(id, result);
   },
 };

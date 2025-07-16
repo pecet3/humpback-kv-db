@@ -1,8 +1,5 @@
 use crate::{
-    js::{
-        self,
-        runtime::{Event, Runtime},
-    },
+    js::{self, event::Event, runtime::Runtime},
     kv::{core::Core, objects::Kind},
 };
 use axum::{
@@ -68,6 +65,11 @@ struct ExecRequest {
     token: String,
     key: String,
 }
+#[derive(Deserialize)]
+struct ExecNowRequest {
+    token: String,
+    code: String,
+}
 
 #[derive(Serialize)]
 struct SuccessResponse {
@@ -106,6 +108,7 @@ pub async fn run(core: Arc<Core>) -> Result<(), Box<dyn Error>> {
         .route("/list", post(handle_list))
         .route("/listType", post(handle_list_type))
         .route("/exec", post(handle_exec))
+        .route("/execNow", post(handle_exec_now))
         .layer(
             ServiceBuilder::new()
                 .layer(TraceLayer::new_for_http())
@@ -366,7 +369,7 @@ async fn handle_exec(
     match object {
         Some(object) => match String::from_utf8(object.data) {
             Ok(code) => {
-                let event = js::runtime::Event::new_code_event(code);
+                let event = js::event::Event::new_code_event(code);
                 state.runtime.push_event(event);
                 println!("{:?}", 22);
                 Ok(create_success_response(None))
@@ -375,4 +378,19 @@ async fn handle_exec(
         },
         None => Err(create_error_response("Not found")),
     }
+}
+
+async fn handle_exec_now(
+    State(state): State<AppState>,
+    Json(request): Json<ExecNowRequest>,
+) -> ApiResult<SuccessResponse> {
+    if !verify_token(&request.token) {
+        return Err(create_error_response("Invalid token"));
+    }
+    let event = js::event::Event::new_code_event(request.code);
+    let rx = state.runtime.push_event(event);
+    if let Ok(response) = rx.await {
+        return Ok(create_success_response(Some(response)));
+    }
+    Ok(create_success_response(None))
 }
