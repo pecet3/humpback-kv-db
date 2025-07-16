@@ -1,5 +1,9 @@
 use crate::{
-    js::{self, runtime::Runtime},
+    js::{
+        self,
+        core::{Event, Runt},
+        runtime::Runtime,
+    },
     kv::{core::Core, objects::Kind},
 };
 use axum::{
@@ -9,9 +13,9 @@ use axum::{
     response::{Html, Json as ResponseJson},
     routing::{get, post},
 };
-use deno_core::serde_json;
+use deno_core::serde_json::{self, json};
 use serde::{Deserialize, Serialize};
-use std::{error::Error, io::Write, str::FromStr, sync::Arc, time::Duration};
+use std::{collections::HashMap, error::Error, io::Write, str::FromStr, sync::Arc, time::Duration};
 use tokio::{signal, sync::Notify};
 use tower::ServiceBuilder;
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
@@ -90,7 +94,6 @@ type ApiResult<T> = Result<ResponseJson<T>, (StatusCode, ResponseJson<ErrorRespo
 #[tokio::main]
 pub async fn run(core: Arc<Core>) -> Result<(), Box<dyn Error>> {
     let runtime: Arc<Runtime> = js::runtime::Runtime::new(Arc::clone(&core));
-
     let state = AppState {
         core: Arc::clone(&core),
         runtime,
@@ -364,7 +367,13 @@ async fn handle_exec(
     match object {
         Some(object) => match String::from_utf8(object.data) {
             Ok(code) => {
-                let _ = state.runtime.execute(&code);
+                let _ = state.runtime.execute(Event {
+                    id: 1,
+                    path: "/something".into(),
+                    payload: json!({"some": "data"}),
+                    headers: None,
+                    event_type: "request".into(),
+                });
                 Ok(create_success_response(None))
             }
             Err(_) => Err(create_error_response("Invalid UTF-8")),

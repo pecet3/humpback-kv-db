@@ -1,7 +1,8 @@
 use crate::{
-    js::{self, runtime::Runtime},
+    js::{self, core::Event, runtime::Runtime},
     kv::{core::Core, objects::Kind},
 };
+use deno_core::serde_json::json;
 use std::{
     error::Error,
     io::Write,
@@ -224,7 +225,13 @@ async fn handle_client(
                 match object {
                     Some(object) => {
                         let _ = match String::from_utf8(object.data) {
-                            Ok(s) => runtime.execute(&s),
+                            Ok(s) => runtime.execute(Event {
+                                id: 1,
+                                path: "/something".into(),
+                                payload: json!({"some": "data"}),
+                                headers: None,
+                                event_type: "request".into(),
+                            }),
                             Err(_) => {
                                 writer.write_all(b"> INVALID UTF-8\n").await?;
                                 continue;

@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 #[op2]
 #[serde]
-pub fn db_get_value(
+pub fn kv_get_value(
     state: &mut OpState,
     #[string] key: String,
 ) -> Result<Option<AnyValue>, AnyError> {
@@ -36,7 +36,7 @@ pub fn db_get_value(
 }
 
 #[op2(fast)]
-pub fn db_set_string(
+pub fn kv_set_string(
     state: &mut OpState,
     #[string] key: String,
     #[string] data: String,
@@ -48,7 +48,7 @@ pub fn db_set_string(
 }
 
 #[op2(fast)]
-pub fn db_set_number(
+pub fn kv_set_number(
     state: &mut OpState,
     #[string] key: String,
     data: f64,
