@@ -1,17 +1,16 @@
-use deno_core::JsRuntime;
-use deno_core::RuntimeOptions;
-use deno_core::error::AnyError;
 use deno_core::extension;
+use deno_core::futures::channel::oneshot;
+use deno_core::serde_json;
+
 use deno_core::serde_json::json;
-use deno_core::v8;
+use serde::Deserialize;
+use serde::Serialize;
 use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::sync::Mutex;
-use tracing::event;
 
-use crate::js::core::Event;
 use crate::js::op_event;
 use crate::js::op_file;
 use crate::js::op_http;
@@ -22,7 +21,6 @@ use std::{
     sync::mpsc::{self, Receiver, Sender},
     thread,
 };
-
 extension!(
   runjs,
   ops = [
@@ -38,7 +36,45 @@ extension!(
  esm_entry_point = "ext:runjs/runtime.js",
  esm = [dir "src/js", "runtime.js"],
 );
+use std::sync::atomic::{AtomicI32, Ordering};
 
+static NEXT_ID: AtomicI32 = AtomicI32::new(1);
+
+fn next_id() -> i32 {
+    NEXT_ID.fetch_add(1, Ordering::Relaxed)
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Event {
+    pub id: i32,
+    pub path: String,
+    pub event_type: String,
+    pub payload: serde_json::Value,
+    pub code: String,
+}
+impl Event {
+    pub fn new_code_event(code: String) -> Event {
+        Event {
+            id: next_id(),
+            code,
+            event_type: "code".to_string(),
+            path: "".to_string(),
+            payload: serde_json::json!({}),
+        }
+    }
+
+    pub fn new_request_event(path: String, payload: serde_json::Value) -> Event {
+        Event {
+            id: next_id(),
+            code: "".to_string(),
+            event_type: "request".to_string(),
+            path,
+            payload,
+        }
+    }
+}
+pub type Events = Arc<Mutex<VecDeque<Event>>>;
+pub type Dones = Arc<Mutex<HashMap<u32, oneshot::Sender<serde_json::Value>>>>;
 pub struct Runtime {
     events: Arc<Mutex<VecDeque<Event>>>,
 }
@@ -49,9 +85,8 @@ impl Runtime {
         Arc::new(Runtime { events })
     }
 
-    pub fn execute(&self, event: Event) {
+    pub fn push_event(&self, event: Event) {
         let mut queue = self.events.lock().unwrap();
-        println!("pushing event {:?}", event);
         queue.push_back(event);
     }
 }
@@ -64,7 +99,7 @@ fn spawn_js_runtime(core: Arc<Core>, events: Arc<Mutex<VecDeque<Event>>>) {
 
         rt.block_on(async move {
             let main_module = deno_core::resolve_path(
-                "./humpback-data/scripts/example.js",
+                "./humpback-data/scripts/eventLoop.js",
                 &std::env::current_dir().unwrap(),
             )
             .unwrap();
@@ -82,7 +117,6 @@ fn spawn_js_runtime(core: Arc<Core>, events: Arc<Mutex<VecDeque<Event>>>) {
                 op_state.put::<Arc<Mutex<VecDeque<Event>>>>(Arc::clone(&events));
             }
 
-            // Wczytaj i uruchom JS moduł
             let mod_id = js_runtime.load_main_es_module(&main_module).await.unwrap();
             let result = js_runtime.mod_evaluate(mod_id);
             js_runtime.run_event_loop(Default::default()).await.unwrap();

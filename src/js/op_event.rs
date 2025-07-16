@@ -2,7 +2,7 @@ use deno_core::op2;
 use deno_core::{OpState, error::AnyError, futures::FutureExt};
 use std::{cell::RefCell, rc::Rc};
 
-use crate::js::core::{Event, Events};
+use crate::js::runtime::{Event, Events};
 
 #[op2]
 #[serde]

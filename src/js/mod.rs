@@ -1,4 +1,3 @@
-pub mod core;
 mod op_event;
 mod op_file;
 mod op_http;

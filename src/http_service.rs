@@ -1,8 +1,7 @@
 use crate::{
     js::{
         self,
-        core::{Event, Runt},
-        runtime::Runtime,
+        runtime::{Event, Runtime},
     },
     kv::{core::Core, objects::Kind},
 };
@@ -367,13 +366,9 @@ async fn handle_exec(
     match object {
         Some(object) => match String::from_utf8(object.data) {
             Ok(code) => {
-                let _ = state.runtime.execute(Event {
-                    id: 1,
-                    path: "/something".into(),
-                    payload: json!({"some": "data"}),
-                    headers: None,
-                    event_type: "request".into(),
-                });
+                let event = js::runtime::Event::new_code_event(code);
+                state.runtime.push_event(event);
+                println!("{:?}", 22);
                 Ok(create_success_response(None))
             }
             Err(_) => Err(create_error_response("Invalid UTF-8")),

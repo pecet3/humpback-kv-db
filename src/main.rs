@@ -2,13 +2,12 @@ use std::{collections::HashMap, sync::Arc};
 
 use deno_core::{futures::channel::oneshot, serde_json::json};
 
-use crate::js::core::{Event, Runt};
+use crate::js::runtime::{Event, Runtime};
 
 mod http_service;
 mod js;
 mod kv;
 mod sql;
-mod tcp_service;
 
 const DIR_PATH: &str = "./humpback-data";
 
@@ -25,9 +24,9 @@ fn main() {
         "#
     );
 
-    let core = kv::core::Core::new().expect("Init error");
+    let kv = kv::core::Core::new().expect("Init error");
 
-    match http_service::run(Arc::clone(&core)) {
+    match http_service::run(Arc::clone(&kv)) {
         Ok(_) => {}
         Err(e) => {
             println!("{}", e);
