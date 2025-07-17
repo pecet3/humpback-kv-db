@@ -34,35 +34,18 @@ pub fn op_kv_get_value(
         None => json!(null),
     })
 }
-// #[op2]
-// #[serde]
-// pub fn op_kv_get_value(
-//     state: &mut OpState,
-//     #[string] key: String,
-// ) -> Result<Option<AnyValue>, AnyError> {
-//     let core = state.borrow::<Arc<kv::core::Core>>().clone();
-//     let value = core.get(&key);
 
-//     Ok(match value {
-//         Some(object) => match object.desc.kind {
-//             Kind::String => {
-//                 let string = String::from_utf8(object.data)?;
-//                 Some(AnyValue::String(string))
-//             }
-//             Kind::Number => {
-//                 let bytes: [u8; 8] = object.data.as_slice().try_into()?;
-//                 let f64 = f64::from_le_bytes(bytes);
-//                 Some(AnyValue::Number(f64))
-//             }
-//             _ => {
-//                 let string = String::from_utf8(object.data)?;
-//                 Some(AnyValue::String(string))
-//             }
-//         },
-//         None => None,
-//     })
-// }
+#[op2]
+#[string]
+pub fn op_kv_get_kind(state: &mut OpState, #[string] key: String) -> Result<String, AnyError> {
+    let core = state.borrow::<Arc<kv::core::Core>>().clone();
+    let value = core.get(&key);
 
+    Ok(match value {
+        Some(object) => Kind::to_string(&object.desc.kind),
+        None => "null".to_string(),
+    })
+}
 #[op2(fast)]
 pub fn op_kv_set_string(
     state: &mut OpState,

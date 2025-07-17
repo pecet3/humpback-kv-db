@@ -27,7 +27,13 @@ globalThis.file = {
 
 globalThis.kv = {
   get: (key) => {
-    return core.ops.op_kv_get_value(key);
+    const value = core.ops.op_kv_get_value(key);
+    const kind = core.ops.op_kv_get_kind(key);
+    if (kind === "object") {
+      const obj = JSON.parse(value);
+      return obj;
+    }
+    return value;
   },
   set: (key, data) => {
     const type = typeof data;

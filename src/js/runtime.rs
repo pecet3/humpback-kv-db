@@ -19,6 +19,7 @@ extension!(
   runjs,
   ops = [
     op_kv::op_kv_get_value,
+    op_kv::op_kv_get_kind,
     op_kv::op_kv_set_string,
     op_kv::op_kv_set_number,
     op_kv::op_kv_set_object,
