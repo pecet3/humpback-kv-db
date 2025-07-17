@@ -38,6 +38,9 @@ globalThis.kv = {
     if (type === "number") {
       return core.ops.op_kv_set_number(key, data);
     }
+    if (type === "object") {
+      return core.ops.op_kv_set_object(key, data);
+    }
   },
 };
 

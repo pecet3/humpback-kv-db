@@ -371,7 +371,6 @@ async fn handle_exec(
             Ok(code) => {
                 let event = js::event::Event::new_code_event(code);
                 state.runtime.push_event(event);
-                println!("{:?}", 22);
                 Ok(create_success_response(None))
             }
             Err(_) => Err(create_error_response("Invalid UTF-8")),
