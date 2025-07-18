@@ -14,6 +14,8 @@ use crate::js::op_event;
 use crate::js::op_http;
 use crate::js::op_kv;
 use crate::js::op_sql;
+use crate::js::runtime::Events;
+use crate::js::runtime::Results;
 use crate::kv;
 use crate::sql;
 use kv::core::Core;
@@ -39,18 +41,16 @@ extension!(
  esm = [dir "src/js", "runtime.js"],
 );
 
-pub type Events = Arc<Mutex<VecDeque<Event>>>;
-pub type Results = Arc<Mutex<HashMap<i32, oneshot::Sender<serde_json::Value>>>>;
-pub struct Runtime {
+pub struct RuntimeA {
     events: Events,
     results: Results,
 }
-impl Runtime {
+impl RuntimeA {
     pub fn new(core: Arc<Core>) -> Arc<Self> {
         let events: Events = Arc::new(Mutex::new(VecDeque::new()));
         let results: Results = Arc::new(Mutex::new(HashMap::new()));
         spawn_js_runtime(Arc::clone(&core), Arc::clone(&events), Arc::clone(&results));
-        Arc::new(Runtime { events, results })
+        Arc::new(RuntimeA { events, results })
     }
 
     pub fn push_event(&self, event: Event) -> oneshot::Receiver<serde_json::Value> {
