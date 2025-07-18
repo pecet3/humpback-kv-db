@@ -1,22 +1,28 @@
+use std::sync::Mutex;
+
 use deno_core::serde_json::{Map, Value};
 use rusqlite::{Connection, Result, Row};
 
 pub struct Db {
-    conn: Connection,
+    conn: Mutex<Connection>,
 }
 
 impl Db {
-    pub fn new(path: &str) -> Result<Self> {
+    pub fn new(path: &str) -> Result<Self, rusqlite::Error> {
         let conn = Connection::open(path)?;
-        Ok(Self { conn })
+        Ok(Self {
+            conn: Mutex::new(conn),
+        })
     }
-
-    pub fn execute_batch(&self, sql: &str) -> Result<()> {
-        self.conn.execute_batch(sql)
+    pub fn execute_batch(&self, sql: &str) -> Result<(), rusqlite::Error> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute_batch(sql)
     }
 
     pub fn query_json(&self, sql: &str) -> Result<Value> {
-        let mut stmt = self.conn.prepare(sql)?;
+        let conn = self.conn.lock().unwrap();
+
+        let mut stmt = conn.prepare(sql)?;
         let column_names: Vec<String> = stmt.column_names().iter().map(|s| s.to_string()).collect();
 
         let rows = stmt

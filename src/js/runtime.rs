@@ -8,6 +8,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::sync::Mutex;
 
+use crate::STORE_PATH;
 use crate::js::event::Event;
 use crate::js::op_event;
 use crate::js::op_http;
@@ -87,7 +88,7 @@ fn spawn_js_runtime(core: Arc<Core>, events: Events, results: Results) {
                     extensions: vec![runjs::init_ops_and_esm()],
                     ..Default::default()
                 });
-                let db = sql::core::Db::new("./humpback-data/store.db").unwrap();
+                let db = sql::core::Db::new(STORE_PATH).unwrap();
                 {
                     let op_state = js_runtime.op_state();
                     let mut op_state = op_state.borrow_mut();

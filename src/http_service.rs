@@ -1,6 +1,8 @@
 use crate::{
+    STORE_PATH,
     js::{self, event::Event, runtime::Runtime},
     kv::{self, core::Core, objects::Kind},
+    sql::{self, core::Db},
 };
 use axum::{
     Router,
@@ -17,12 +19,6 @@ use tower::ServiceBuilder;
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
 
 const AUTH_TOKEN: &str = "humpback_secret_token_2024";
-
-#[derive(Clone)]
-pub struct AppState {
-    pub core: Arc<Core>,
-    pub runtime: Arc<Runtime>,
-}
 
 #[derive(Deserialize)]
 struct BaseRequest {
@@ -89,6 +85,12 @@ struct ListItem {
     kind: String,
     size: usize,
 }
+#[derive(Clone)]
+pub struct AppState {
+    pub core: Arc<Core>,
+    pub runtime: Arc<Runtime>,
+    pub db: Arc<Db>,
+}
 
 type ApiResult<T> = Result<ResponseJson<T>, (StatusCode, ResponseJson<ErrorResponse>)>;
 
@@ -96,9 +98,11 @@ type ApiResult<T> = Result<ResponseJson<T>, (StatusCode, ResponseJson<ErrorRespo
 pub async fn run() -> Result<(), Box<dyn Error>> {
     let core = kv::core::Core::new().unwrap();
     let runtime: Arc<Runtime> = js::runtime::Runtime::new(Arc::clone(&core));
+    let db = Arc::new(sql::core::Db::new(STORE_PATH).unwrap());
     let state = AppState {
         core: Arc::clone(&core),
         runtime,
+        db,
     };
 
     let app = Router::new()

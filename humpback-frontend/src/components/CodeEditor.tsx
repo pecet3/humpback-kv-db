@@ -54,7 +54,7 @@ export const ExecuteCodeForm: React.FC<{
     });
   };
   return (
-    <div className="w-full bg-slate-900 py-2 pb-12 m-auto rounded-xl h-full flex flex-col justify-center items-center gap-4">
+    <div className="w-[600px] h-auto bg-slate-900 py-2 m-auto rounded-xl h-full flex flex-col justify-center items-center ">
       <AceEditor
         height="400px"
         width="600px"
@@ -63,7 +63,7 @@ export const ExecuteCodeForm: React.FC<{
         theme="monokai"
         onLoad={handleEditorLoad}
         onChange={(v) => setCode(v)}
-        fontSize="16px"
+        fontSize="14px"
         highlightActiveLine={true}
         setOptions={{
           enableLiveAutocompletion: true,
@@ -72,18 +72,18 @@ export const ExecuteCodeForm: React.FC<{
         }}
         editorProps={{ $blockScrolling: true }}
       />
-      <div className="h-32 overflow-y-auto">
+      <ul className="h-32 px-2 overflow-y-auto bg-black w-[600px]">
         {results.map((r, idx) => (
-          <p key={idx} className="font-mono text-xs my-2 text-white">
-            {r}
-          </p>
+          <li key={idx} className="font-mono text-xs my-2 text-white">
+            <span className="text-sky-400 px-1">{`[+]`}</span> {r}
+          </li>
         ))}
-      </div>
+      </ul>
       <button
         type="button"
         onClick={handleSubmit}
         disabled={isLoading}
-        className="w-32 bg-slate-500  hover:bg-slate-400  font-mono font-bold hover:cursor-pointer disabled:bg-gray-400 text-white py-2 px-4 rounded-lg transition-colors"
+        className="w-32 bg-slate-500 my-2  hover:bg-slate-400  font-mono font-bold hover:cursor-pointer disabled:bg-gray-400 text-white py-2 px-4 rounded-lg transition-colors"
       >
         {isLoading ? "Executing..." : "Execute"}
       </button>
