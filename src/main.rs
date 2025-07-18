@@ -1,6 +1,4 @@
-use std::sync::Arc;
-
-mod http_service;
+mod http_server;
 mod js;
 mod kv;
 mod sql;
@@ -20,7 +18,7 @@ fn main() {
         "#
     );
 
-    match http_service::run() {
+    match http_server::router::run() {
         Ok(_) => {}
         Err(e) => {
             println!("{}", e);
