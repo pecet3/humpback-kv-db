@@ -20,6 +20,7 @@ rusqlite = { version = "0.30", features = ["bundled"] }
 rand = "0.8"
 ureq = "3.0.12"
 base64 = "0.22.1"
+isahc = "1.7.2"
 [dependencies.uuid]
 version = "1.17.0"
 features = ["v4"]

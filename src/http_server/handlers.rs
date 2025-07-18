@@ -15,9 +15,33 @@ use axum::{
 use deno_core::serde_json::{self, json};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, error::Error, io::Write, str::FromStr, sync::Arc, time::Duration};
-use tokio::{signal, sync::Notify, time::timeout};
-use tower::ServiceBuilder;
-use tower_http::{cors::CorsLayer, trace::TraceLayer};
+use tokio::time::timeout;
+
+fn verify_token(token: &str) -> bool {
+    token == AUTH_TOKEN
+}
+
+pub async fn serve_html() -> Html<&'static str> {
+    Html(include_str!("../../index.html"))
+}
+
+fn create_error_response(error: &str) -> (StatusCode, ResponseJson<ErrorResponse>) {
+    (
+        StatusCode::BAD_REQUEST,
+        ResponseJson(ErrorResponse {
+            status: "error".to_string(),
+            error: error.to_string(),
+        }),
+    )
+}
+
+fn create_success_response(data: Option<serde_json::Value>) -> ResponseJson<SuccessResponse> {
+    ResponseJson(SuccessResponse {
+        status: "success".to_string(),
+        data,
+    })
+}
+
 #[derive(Deserialize)]
 pub struct BaseRequest {
     token: String,
@@ -82,6 +106,17 @@ pub struct ListItem {
     key: String,
     kind: String,
     size: usize,
+}
+
+#[derive(Deserialize)]
+pub struct SqlExecRequest {
+    token: String,
+    statement: String,
+}
+#[derive(Deserialize)]
+pub struct SqlQueryRequest {
+    token: String,
+    query: String,
 }
 
 type ApiResult<T> = Result<ResponseJson<T>, (StatusCode, ResponseJson<ErrorResponse>)>;
@@ -306,27 +341,51 @@ pub async fn handle_exec_now(
     Ok(create_success_response(None))
 }
 
-fn verify_token(token: &str) -> bool {
-    token == AUTH_TOKEN
+pub async fn handle_sql_exec(
+    State(state): State<AppState>,
+    Json(request): Json<SqlExecRequest>,
+) -> ApiResult<SuccessResponse> {
+    if !verify_token(&request.token) {
+        return Err(create_error_response("Invalid token"));
+    }
+
+    match state.db.execute_batch(&request.statement) {
+        Ok(()) => {
+            let response_data = serde_json::json!({
+                "message": "Statement executed successfully",
+                "rows_affected": null
+            });
+            Ok(create_success_response(Some(response_data)))
+        }
+        Err(e) => Err(create_error_response(&format!(
+            "SQL execution error: {}",
+            e
+        ))),
+    }
 }
 
-pub async fn serve_html() -> Html<&'static str> {
-    Html(include_str!("../../index.html"))
-}
+pub async fn handle_sql_query(
+    State(state): State<AppState>,
+    Json(request): Json<SqlQueryRequest>,
+) -> ApiResult<SuccessResponse> {
+    if !verify_token(&request.token) {
+        return Err(create_error_response("Invalid token"));
+    }
 
-fn create_error_response(error: &str) -> (StatusCode, ResponseJson<ErrorResponse>) {
-    (
-        StatusCode::BAD_REQUEST,
-        ResponseJson(ErrorResponse {
-            status: "error".to_string(),
-            error: error.to_string(),
-        }),
-    )
-}
+    match state.db.query_json(&request.query) {
+        Ok(data) => {
+            let rows_count = match &data {
+                serde_json::Value::Array(arr) => arr.len(),
+                _ => 0,
+            };
 
-fn create_success_response(data: Option<serde_json::Value>) -> ResponseJson<SuccessResponse> {
-    ResponseJson(SuccessResponse {
-        status: "success".to_string(),
-        data,
-    })
+            let response_data = serde_json::json!({
+                "data": data,
+                "rows_count": rows_count
+            });
+
+            Ok(create_success_response(Some(response_data)))
+        }
+        Err(e) => Err(create_error_response(&format!("SQL query error: {}", e))),
+    }
 }

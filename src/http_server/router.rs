@@ -48,6 +48,8 @@ pub async fn run() -> Result<(), Box<dyn Error>> {
         .route("/listType", post(handlers::handle_list_type))
         .route("/exec", post(handlers::handle_exec))
         .route("/execNow", post(handlers::handle_exec_now))
+        .route("/sql/exec", post(handlers::handle_sql_exec))
+        .route("/sql/query", post(handlers::handle_sql_query))
         .layer(
             ServiceBuilder::new()
                 .layer(TraceLayer::new_for_http())

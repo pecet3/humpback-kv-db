@@ -30,13 +30,22 @@ export const Sidebar: React.FC<{
 
       <nav className="flex-1 px-4">
         <button
-          onClick={() => setActiveView("database")}
+          onClick={() => setActiveView("kv")}
           className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg mb-2 transition-colors ${
             activeView === "database" ? "bg-blue-600" : "hover:bg-gray-700"
           }`}
         >
           <Database className="h-4 w-4" />
-          Database Items
+          Key-Value Database
+        </button>
+        <button
+          onClick={() => setActiveView("sql")}
+          className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg mb-2 transition-colors ${
+            activeView === "database" ? "bg-blue-600" : "hover:bg-gray-700"
+          }`}
+        >
+          <Database className="h-4 w-4" />
+          SQL Database
         </button>
 
         <button

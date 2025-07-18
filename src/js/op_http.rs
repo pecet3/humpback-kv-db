@@ -11,38 +11,34 @@ pub fn op_http_get(#[string] url: String) -> Result<String, AnyError> {
     Ok(body)
 }
 
-// #[op2]
-// #[string]
-// pub fn op_http_post(#[string] url: String, #[string] body: String) -> Result<String, AnyError> {
-//     let response = ureq::post(&url)
-//         .header("Content-Type", "application/json")
-//         .send(body);
+#[op2]
+#[string]
+pub fn op_http_post(#[string] url: String, #[string] body: String) -> Result<String, AnyError> {
+    let response = ureq::post(&url)
+        .header("Content-Type", "application/json")
+        .send(body)
+        .unwrap();
+    let body = response.into_body().read_to_string().unwrap();
+    Ok(body)
+}
 
-//     reader.read_to_string(&mut resp_body)?;
-//     Ok(resp_body)
-// }
+#[op2]
+#[string]
+pub fn op_http_put(#[string] url: String, #[string] body: String) -> Result<String, AnyError> {
+    let response = ureq::put(&url)
+        .header("Content-Type", "application/json")
+        .send(&body)?;
+    let body = response.into_body().read_to_string().unwrap();
+    Ok(body)
+}
 
-// #[op2]
-// #[string]
-// pub fn op_http_put(#[string] url: String, #[string] body: String) -> Result<String, AnyError> {
-//     let response = ureq::put(&url)
-//         .set("Content-Type", "application/json")
-//         .send_string(&body)?;
-//     let mut reader = response.into_reader();
-//     let mut resp_body = String::new();
-//     reader.read_to_string(&mut resp_body)?;
-//     Ok(resp_body)
-// }
-
-// #[op2]
-// #[string]
-// pub fn op_http_delete(#[string] url: String) -> Result<String, AnyError> {
-//     let response = ureq::delete(&url).call()?;
-//     let mut reader = response.into_reader();
-//     let mut body = String::new();
-//     reader.read_to_string(&mut body)?;
-//     Ok(body)
-// }
+#[op2]
+#[string]
+pub fn op_http_delete(#[string] url: String) -> Result<String, AnyError> {
+    let response = ureq::delete(&url).call()?;
+    let body = response.into_body().read_to_string().unwrap();
+    Ok(body)
+}
 
 // #[op2]
 // #[string]

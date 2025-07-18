@@ -4,6 +4,7 @@ import { ExecuteCodeForm } from "./components/CodeEditor";
 import type { ApiResponse, KVItem } from "./types";
 import { DatabaseList } from "./components/DatebaseList";
 import { Sidebar } from "./components/Sidebar";
+import SqlManager from "./components/SqlManager";
 
 // Constants
 const API_BASE = "http://localhost:8080";
@@ -355,7 +356,7 @@ const App: React.FC = () => {
       />
 
       <main className="mx-[48vh] p-6">
-        {activeView === "database" && (
+        {activeView === "kv" && (
           <DatabaseList
             items={items}
             searchQuery={searchQuery}
@@ -378,6 +379,7 @@ const App: React.FC = () => {
             resultsResponses={results}
           />
         )}
+        {activeView === "sql" && <SqlManager />}
       </main>
 
       <FloatingScriptButton

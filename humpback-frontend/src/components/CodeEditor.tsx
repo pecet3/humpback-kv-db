@@ -54,10 +54,10 @@ export const ExecuteCodeForm: React.FC<{
     });
   };
   return (
-    <div className="w-[600px] h-auto bg-slate-900 py-2 m-auto rounded-xl h-full flex flex-col justify-center items-center ">
+    <div className="w-[820px] h-auto bg-slate-900 py-2 m-auto rounded-xl h-full flex flex-col justify-center items-center ">
       <AceEditor
-        height="400px"
-        width="600px"
+        height="600px"
+        width="820px"
         value={code}
         mode="javascript"
         theme="monokai"
@@ -72,7 +72,7 @@ export const ExecuteCodeForm: React.FC<{
         }}
         editorProps={{ $blockScrolling: true }}
       />
-      <ul className="h-32 px-2 overflow-y-auto bg-black w-[600px]">
+      <ul className="h-32 px-2 overflow-y-auto bg-black w-[820px]">
         {results.map((r, idx) => (
           <li key={idx} className="font-mono text-xs my-2 text-white">
             <span className="text-sky-400 px-1">{`[+]`}</span> {r}
