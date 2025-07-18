@@ -12,7 +12,9 @@ use crate::js::event::Event;
 use crate::js::op_event;
 use crate::js::op_http;
 use crate::js::op_kv;
+use crate::js::op_sql;
 use crate::kv;
+use crate::sql;
 use kv::core::Core;
 use std::thread;
 extension!(
@@ -23,6 +25,8 @@ extension!(
     op_kv::op_kv_set_string,
     op_kv::op_kv_set_number,
     op_kv::op_kv_set_object,
+    op_sql::op_sql_exec,
+    op_sql::op_sql_query,
     op_http::op_http_get,
     // op_http::op_http_post,
     // op_http::op_http_delete,
@@ -83,13 +87,14 @@ fn spawn_js_runtime(core: Arc<Core>, events: Events, results: Results) {
                     extensions: vec![runjs::init_ops_and_esm()],
                     ..Default::default()
                 });
-
+                let db = sql::core::Db::new("./humpback-data/store.db").unwrap();
                 {
                     let op_state = js_runtime.op_state();
                     let mut op_state = op_state.borrow_mut();
                     op_state.put::<Arc<Core>>(Arc::clone(&core));
                     op_state.put::<Events>(Arc::clone(&events));
                     op_state.put::<Results>(Arc::clone(&results));
+                    op_state.put::<sql::core::Db>(db);
                 }
 
                 let mod_id = js_runtime.load_main_es_module(&main_module).await.unwrap();

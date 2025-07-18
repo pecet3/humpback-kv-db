@@ -1,6 +1,6 @@
 use crate::{
     js::{self, event::Event, runtime::Runtime},
-    kv::{core::Core, objects::Kind},
+    kv::{self, core::Core, objects::Kind},
 };
 use axum::{
     Router,
@@ -93,7 +93,8 @@ struct ListItem {
 type ApiResult<T> = Result<ResponseJson<T>, (StatusCode, ResponseJson<ErrorResponse>)>;
 
 #[tokio::main]
-pub async fn run(core: Arc<Core>) -> Result<(), Box<dyn Error>> {
+pub async fn run() -> Result<(), Box<dyn Error>> {
+    let core = kv::core::Core::new().unwrap();
     let runtime: Arc<Runtime> = js::runtime::Runtime::new(Arc::clone(&core));
     let state = AppState {
         core: Arc::clone(&core),

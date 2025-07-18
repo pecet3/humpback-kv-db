@@ -13,15 +13,13 @@ globalThis.console = {
   },
 };
 
-globalThis.file = {
-  read: (path) => {
-    return core.ops.op_file_read(path);
+globalThis.sql = {
+  query: (query) => {
+    return core.ops.op_sql_query(query);
   },
-  write: (path, contents) => {
-    return core.ops.op_file_write(path, contents);
-  },
-  remove: (path) => {
-    return core.ops.op_file_remove(path);
+
+  exec: (stmt) => {
+    return core.ops.op_sql_exec(stmt);
   },
 };
 

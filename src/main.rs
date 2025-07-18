@@ -3,7 +3,8 @@ use std::sync::Arc;
 mod http_service;
 mod js;
 mod kv;
-
+mod sql;
+mod state;
 const DIR_PATH: &str = "./humpback-data";
 
 fn main() {
@@ -19,9 +20,7 @@ fn main() {
         "#
     );
 
-    let kv = kv::core::Core::new().expect("Init error");
-
-    match http_service::run(Arc::clone(&kv)) {
+    match http_service::run() {
         Ok(_) => {}
         Err(e) => {
             println!("{}", e);
