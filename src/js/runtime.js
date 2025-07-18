@@ -27,8 +27,15 @@ globalThis.file = {
 
 globalThis.kv = {
   get: (key) => {
-    return core.ops.op_kv_get_value(key);
+    const kind = core.ops.op_kv_get_kind(key);
+    const value = core.ops.op_kv_get_value(key);
+    if (kind == "object") {
+      const parsed = JSON.parse(value);
+      return parsed;
+    }
+    return value;
   },
+
   set: (key, data) => {
     const type = typeof data;
     core.print(type);
@@ -47,6 +54,15 @@ globalThis.kv = {
 globalThis.http = {
   get: (url) => {
     return core.ops.op_http_get(url);
+  },
+  post: (url, body) => {
+    return core.ops.op_http_post(url, body);
+  },
+  put: (url, body) => {
+    return core.ops.op_http_put(url, body);
+  },
+  post: (url) => {
+    return core.ops.op_http_delete(url);
   },
 };
 

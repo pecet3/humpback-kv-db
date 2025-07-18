@@ -12,7 +12,7 @@ use axum::{
 use deno_core::serde_json::{self, json};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, error::Error, io::Write, str::FromStr, sync::Arc, time::Duration};
-use tokio::{signal, sync::Notify};
+use tokio::{signal, sync::Notify, time::timeout};
 use tower::ServiceBuilder;
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
 
@@ -388,8 +388,9 @@ async fn handle_exec_now(
     }
     let event = js::event::Event::new_code_event(request.code);
     let rx = state.runtime.push_event(event);
-    if let Ok(response) = rx.await {
-        return Ok(create_success_response(Some(response)));
+    if let Ok(Ok(mut response)) = timeout(Duration::from_secs(5), rx).await {
+        let resp = response.take();
+        return Ok(create_success_response(Some(resp)));
     }
     Ok(create_success_response(None))
 }

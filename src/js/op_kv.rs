@@ -34,6 +34,17 @@ pub fn op_kv_get_value(
         None => json!(null),
     })
 }
+#[op2]
+#[string]
+pub fn op_kv_get_kind(state: &mut OpState, #[string] key: String) -> Result<String, AnyError> {
+    let core = state.borrow::<Arc<kv::core::Core>>().clone();
+    let value = core.get(&key);
+
+    Ok(match value {
+        Some(object) => Kind::to_string(&object.desc.kind),
+        None => "null".to_string(),
+    })
+}
 // #[op2]
 // #[serde]
 // pub fn op_kv_get_value(

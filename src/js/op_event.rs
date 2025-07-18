@@ -1,3 +1,4 @@
+use deno_core::serde_json::json;
 use deno_core::{OpState, error::AnyError, futures::FutureExt};
 use deno_core::{op2, serde_json};
 use std::{cell::RefCell, rc::Rc};
@@ -18,9 +19,9 @@ pub fn op_event_next(state: &mut OpState) -> Result<Option<Event>, AnyError> {
 pub fn op_event_return(state: &mut OpState, id: i32, #[serde] event_result: serde_json::Value) {
     let results = state.borrow::<Results>();
     let mut results_mut = results.lock().unwrap();
-    println!("{:?}", event_result);
+    println!("result {:?}", event_result);
     if let Some(sender) = results_mut.remove(&id) {
-        let result = sender.send(event_result);
+        let result = sender.send(json!(event_result));
         if result.is_err() {
             println!("ERROR");
         }
