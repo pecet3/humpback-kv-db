@@ -1,29 +1,9 @@
 import React, { useState, useEffect } from "react";
-import {
-  Search,
-  Plus,
-  Code,
-  Database,
-  Trash2,
-  Eye,
-  Play,
-  RefreshCw,
-} from "lucide-react";
-
-// Types
-interface KVItem {
-  key: string;
-  kind: "string" | "number" | "boolean" | "json" | "js" | "blob";
-  size: number;
-  data?: any;
-}
-
-interface ApiResponse {
-  status: string;
-  data?: any;
-  error?: string;
-  output?: string;
-}
+import { Search, Plus, Code, Database } from "lucide-react";
+import { ExecuteCodeForm } from "./components/CodeEditor";
+import type { ApiResponse, KVItem } from "./types";
+import { DatabaseList } from "./components/DatebaseList";
+import { Sidebar } from "./components/Sidebar";
 
 // Constants
 const API_BASE = "http://localhost:8080";
@@ -63,70 +43,6 @@ const api = {
   async execNow(code: string) {
     return this.request("/execNow", { code });
   },
-};
-
-// Components
-const Sidebar: React.FC<{
-  activeView: string;
-  setActiveView: (view: string) => void;
-  searchQuery: string;
-  setSearchQuery: (query: string) => void;
-}> = ({ activeView, setActiveView, searchQuery, setSearchQuery }) => {
-  return (
-    <div className="w-92 bg-gray-800 text-white h-screen fixed left-0 top-0 flex flex-col">
-      <div className="p-4">
-        <h1 className="text-xl font-bold flex items-center gap-2">
-          <span className="text-2xl">🐋</span>
-          Humpback KV
-        </h1>
-      </div>
-
-      <div className="p-4">
-        <div className="relative">
-          <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search keys..."
-            className="w-full pl-10 pr-4 py-2 bg-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </div>
-      </div>
-
-      <nav className="flex-1 px-4">
-        <button
-          onClick={() => setActiveView("database")}
-          className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg mb-2 transition-colors ${
-            activeView === "database" ? "bg-blue-600" : "hover:bg-gray-700"
-          }`}
-        >
-          <Database className="h-4 w-4" />
-          Database Items
-        </button>
-
-        <button
-          onClick={() => setActiveView("add")}
-          className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg mb-2 transition-colors ${
-            activeView === "add" ? "bg-blue-600" : "hover:bg-gray-700"
-          }`}
-        >
-          <Plus className="h-4 w-4" />
-          Add Item
-        </button>
-
-        <button
-          onClick={() => setActiveView("execute")}
-          className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg mb-2 transition-colors ${
-            activeView === "execute" ? "bg-blue-600" : "hover:bg-gray-700"
-          }`}
-        >
-          <Code className="h-4 w-4" />
-          Execute Code
-        </button>
-      </nav>
-    </div>
-  );
 };
 
 const FloatingScriptButton: React.FC<{
@@ -256,136 +172,6 @@ const AddItemForm: React.FC<{
   );
 };
 
-const ExecuteCodeForm: React.FC<{
-  onExecute: (code: string) => void;
-  isLoading: boolean;
-}> = ({ onExecute, isLoading }) => {
-  const [code, setCode] = useState("");
-
-  const handleSubmit = () => {
-    if (code.trim()) {
-      onExecute(code);
-    }
-  };
-
-  return (
-    <div className="bg-white rounded-lg shadow-lg p-6">
-      <h2 className="text-xl font-semibold mb-4">Execute Code Directly</h2>
-      <div className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium mb-1">
-            JavaScript Code:
-          </label>
-          <textarea
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-            className="w-full p-2 border rounded-lg h-40 resize-vertical focus:outline-none focus:ring-2 focus:ring-blue-500"
-            style={{ fontFamily: "monospace" }}
-            placeholder="Enter JavaScript code to execute..."
-            required
-          />
-        </div>
-
-        <button
-          type="button"
-          onClick={handleSubmit}
-          disabled={isLoading}
-          className="w-full bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white py-2 px-4 rounded-lg transition-colors"
-        >
-          {isLoading ? "Executing..." : "Execute Code"}
-        </button>
-      </div>
-    </div>
-  );
-};
-
-const DatabaseList: React.FC<{
-  items: KVItem[];
-  searchQuery: string;
-  onRefresh: () => void;
-  onDelete: (key: string) => void;
-  onView: (key: string) => void;
-  onExecute: (key: string) => void;
-  isLoading: boolean;
-}> = ({
-  items,
-  searchQuery,
-  onRefresh,
-  onDelete,
-  onView,
-  onExecute,
-  isLoading,
-}) => {
-  const filteredItems = items.filter((item) =>
-    item.key.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  return (
-    <div className="bg-white rounded-lg shadow-lg p-6">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-semibold">Database Items</h2>
-        <button
-          onClick={onRefresh}
-          disabled={isLoading}
-          className="bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white py-2 px-4 rounded-lg transition-colors flex items-center gap-2"
-        >
-          <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
-          {isLoading ? "Loading..." : "Refresh"}
-        </button>
-      </div>
-
-      <div className="max-h-96 overflow-y-auto border rounded-lg">
-        {filteredItems.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">
-            {searchQuery
-              ? "No items match your search"
-              : "No items in database"}
-          </div>
-        ) : (
-          filteredItems.map((item) => (
-            <div
-              key={item.key}
-              className="flex items-center justify-between p-4 border-b last:border-b-0 hover:bg-gray-50"
-            >
-              <div className="flex-1">
-                <div className="font-medium">{item.key}</div>
-                <div className="text-sm text-gray-500">
-                  Type: {item.kind.toUpperCase()} | Size: {item.size} bytes
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => onView(item.key)}
-                  className="p-2 text-blue-500 hover:bg-blue-50 rounded"
-                  title="View"
-                >
-                  <Eye className="h-4 w-4" />
-                </button>
-                <button
-                  onClick={() => onDelete(item.key)}
-                  className="p-2 text-red-500 hover:bg-red-50 rounded"
-                  title="Delete"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-                {item.kind === "js" && (
-                  <button
-                    onClick={() => onExecute(item.key)}
-                    className="p-2 text-green-500 hover:bg-green-50 rounded"
-                    title="Execute"
-                  >
-                    <Play className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
-            </div>
-          ))
-        )}
-      </div>
-    </div>
-  );
-};
-
 const NotificationToast: React.FC<{
   message: string;
   type: "success" | "error";
@@ -427,6 +213,7 @@ const App: React.FC = () => {
   const showNotification = (message: string, type: "success" | "error") => {
     setNotification({ message, type });
   };
+  const [results, setResults] = useState<string[]>([]);
 
   const loadItems = async () => {
     setIsLoading(true);
@@ -537,8 +324,11 @@ const App: React.FC = () => {
     setIsLoading(true);
     try {
       const result = await api.execNow(code);
+
       if (result.status === "success") {
         showNotification("Code executed successfully!", "success");
+        setResults((prev) => [...prev, JSON.stringify(result.data)]);
+
         if (result.output) {
           alert(`Output:\n${result.output}`);
         }
@@ -564,7 +354,7 @@ const App: React.FC = () => {
         setSearchQuery={setSearchQuery}
       />
 
-      <main className="mx-96 p-6">
+      <main className="mx-[48vh] p-6">
         {activeView === "database" && (
           <DatabaseList
             items={items}
@@ -585,6 +375,7 @@ const App: React.FC = () => {
           <ExecuteCodeForm
             onExecute={handleExecuteCode}
             isLoading={isLoading}
+            resultsResponses={results}
           />
         )}
       </main>

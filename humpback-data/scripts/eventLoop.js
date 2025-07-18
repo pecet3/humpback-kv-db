@@ -1,9 +1,26 @@
-while (true) {
-  let event = await _event.next();
-  if (!event) continue;
-  switch (event.kind) {
+function handleEvent(event) {
+  console.log(event.event_type);
+
+  switch (event.event_type) {
     case "code":
-      handleCode(event);
+      try {
+        const func = new Function("", event.code);
+        const result = func();
+        _event.return(event.id, result);
+      } catch (error) {
+        console.error("Execution error:", error, `event id: ${event.id}`);
+        _event.return(event.id, { error: error.message });
+      }
+      break;
+    default:
+      console.warn("Unknown event type:", event.event_type);
+  }
+}
+
+while (true) {
+  const event = await _event.next();
+  if (event) {
+    await handleEvent(event);
   }
 }
 
@@ -13,7 +30,7 @@ async function handleCode(event) {
   const func = new Function("", event.code);
   try {
     const result = await func();
-    await _event.return(result);
+    _event.return(event.id, result);
   } catch (error) {
     alert(error);
     console.error(error, `event id: ${event.id}`);

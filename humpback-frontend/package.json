@@ -10,8 +10,10 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "ace-builds": "^1.43.2",
     "lucide-react": "^0.525.0",
     "react": "^19.1.0",
+    "react-ace": "^14.0.1",
     "react-dom": "^19.1.0"
   },
   "devDependencies": {
