@@ -1,6 +1,6 @@
 use std::sync::Mutex;
 
-use deno_core::serde_json::{Map, Value};
+use deno_core::serde_json::{self, Map, Value};
 use rusqlite::{Connection, Result, Row};
 
 pub struct Db {
@@ -18,7 +18,15 @@ impl Db {
         let conn = self.conn.lock().unwrap();
         conn.execute_batch(sql)
     }
+    pub fn get_table_info(&self, table_name: &str) -> Result<serde_json::Value, rusqlite::Error> {
+        let sql = format!("PRAGMA table_info({})", table_name);
+        self.query_json(&sql)
+    }
 
+    pub fn list_tables(&self) -> Result<serde_json::Value, rusqlite::Error> {
+        let sql = "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name";
+        self.query_json(sql)
+    }
     pub fn query_json(&self, sql: &str) -> Result<Value> {
         let conn = self.conn.lock().unwrap();
 

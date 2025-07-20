@@ -4,7 +4,9 @@ mod kv;
 mod sql;
 mod state;
 const DIR_PATH: &str = "./humpback-data";
-const STORE_PATH: &str = "./humpback-data/store.db";
+const STORE_PATH: &str = "./humpback-data/store.sql";
+const INTERNAL_STORE_PATH: &str = "./humpback-data/internal.sql";
+
 fn main() {
     println!(
         r#"
