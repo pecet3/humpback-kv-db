@@ -1,5 +1,6 @@
 use deno_core::extension;
 use deno_core::serde_json;
+use tokio::sync::mpsc::unbounded_channel;
 use tokio::sync::oneshot;
 
 use std::collections::HashMap;
@@ -69,6 +70,7 @@ impl Runtime {
     }
 }
 fn spawn_js_runtime(core: Arc<Core>, events: Events, results: Results) {
+    let (tx, rx) = unbounded_channel();
     thread::spawn(move || {
         let rt = tokio::runtime::Builder::new_current_thread()
             .enable_all()
