@@ -1,6 +1,8 @@
 use deno_core::extension;
+
 use deno_core::serde_json;
 use tokio::sync::mpsc::unbounded_channel;
+use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use tokio::sync::oneshot;
 
 use std::collections::HashMap;
@@ -40,6 +42,13 @@ extension!(
  esm = [dir "src/js", "runtime.js"],
 );
 
+enum RuntimeCommand {
+    Resume,
+    Stop,
+    Restart,
+    Shutdown,
+}
+
 pub type Events = Arc<Mutex<VecDeque<Event>>>;
 pub type Results = Arc<Mutex<HashMap<i32, oneshot::Sender<serde_json::Value>>>>;
 pub struct Runtime {
@@ -69,15 +78,28 @@ impl Runtime {
         rx
     }
 }
-fn spawn_js_runtime(core: Arc<Core>, events: Events, results: Results) {
-    let (tx, rx) = unbounded_channel();
+
+fn spawn_js_runtime(
+    core: Arc<Core>,
+    events: Events,
+    results: Results,
+) -> UnboundedSender<RuntimeCommand> {
+    let (tx, mut rx): (
+        UnboundedSender<RuntimeCommand>,
+        UnboundedReceiver<RuntimeCommand>,
+    ) = unbounded_channel();
+
     thread::spawn(move || {
         let rt = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
             .expect("Failed to build Tokio runtime");
 
-        loop {
+        let mut should_restart = true;
+
+        while should_restart {
+            should_restart = false;
+
             let res: Result<(), ()> = rt.block_on(async {
                 let main_module = deno_core::resolve_path(
                     "./humpback-data/scripts/eventLoop.js",
@@ -90,6 +112,7 @@ fn spawn_js_runtime(core: Arc<Core>, events: Events, results: Results) {
                     extensions: vec![runjs::init_ops_and_esm()],
                     ..Default::default()
                 });
+
                 let db = sql::core::Db::new(STORE_PATH).unwrap();
                 {
                     let op_state = js_runtime.op_state();
@@ -99,28 +122,57 @@ fn spawn_js_runtime(core: Arc<Core>, events: Events, results: Results) {
                     op_state.put::<Results>(Arc::clone(&results));
                     op_state.put::<sql::core::Db>(db);
                 }
-                let mod_id = js_runtime.load_main_es_module(&main_module).await.unwrap();
-                let result = js_runtime.mod_evaluate(mod_id);
-                if let Err(e) = js_runtime.run_event_loop(Default::default()).await {
-                    eprintln!("[JS Runtime] 💥 Event loop error: {e}");
-                    return Err(());
-                }
 
-                if let Err(e) = result.await {
-                    eprintln!("[JS Runtime] 💥 Evaluation error: {e}");
-                    return Err(());
+                let mod_id = js_runtime.load_main_es_module(&main_module).await.unwrap();
+                let eval = js_runtime.mod_evaluate(mod_id);
+
+                tokio::select! {
+                    _ = js_runtime.run_event_loop(Default::default()) => {
+                        if let Err(e) = eval.await {
+                            eprintln!("[JS Runtime] 💥 Evaluation error: {e}");
+                            return Err(());
+                        }
+                    }
+                    Some(cmd) = rx.recv() => {
+                        match cmd {
+                            RuntimeCommand::Stop => {
+                                eprintln!("[JS Runtime] ⏸️ Paused");
+                                loop {
+                                    match rx.recv().await {
+                                        Some(RuntimeCommand::Resume) => {
+                                            eprintln!("[JS Runtime] ▶️ Resumed");
+                                            break;
+                                        },
+                                        Some(RuntimeCommand::Shutdown) => {
+                                            eprintln!("[JS Runtime] 🛑 Shutdown during pause");
+                                            return Ok(());
+                                        },
+                                        _ => continue,
+                                    }
+                                }
+                            }
+                            RuntimeCommand::Restart => {
+                                eprintln!("[JS Runtime] 🔁 Restart requested");
+                                return Err(());
+                            }
+                            RuntimeCommand::Shutdown => {
+                                eprintln!("[JS Runtime] 🛑 Shutdown");
+                                return Ok(());
+                            }
+                            _ => {}
+                        }
+                    }
                 }
-                drop(js_runtime);
 
                 Ok(())
             });
 
             if res.is_err() {
+                should_restart = true;
                 eprintln!("[JS Runtime] 🔁 Restarting...");
-                continue;
             }
-
-            break;
         }
     });
+
+    tx
 }
