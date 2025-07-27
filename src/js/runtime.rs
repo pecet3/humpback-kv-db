@@ -17,6 +17,7 @@ use crate::js::op_event;
 use crate::js::op_http;
 use crate::js::op_kv;
 use crate::js::op_sql;
+use crate::js::op_utils;
 use crate::kv;
 use crate::sql;
 use kv::core::Core;
@@ -35,6 +36,7 @@ extension!(
     op_http::op_http_post,
     op_http::op_http_delete,
     op_http::op_http_put,
+    op_utils::op_utils_uuidV4,
     op_event::op_event_next,
     op_event::op_event_return,
   ],

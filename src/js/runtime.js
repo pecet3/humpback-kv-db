@@ -72,3 +72,9 @@ globalThis._event = {
     return core.ops.op_event_return(id, result);
   },
 };
+
+globalThis.utils = {
+  newUuidV4: () => {
+    return core.ops.op_utils_uuidV4();
+  },
+};
