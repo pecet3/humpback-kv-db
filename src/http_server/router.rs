@@ -1,9 +1,10 @@
 use crate::{
-    STORE_PATH,
+    USER_STORE_PATH,
     http_server::handlers,
+    internal::{self, db::InternalDb},
     js::{self, event::Event, runtime::Runtime},
     kv::{self, core::Core, objects::Kind},
-    sql::{self, core::Db},
+    sql::{self, db::Db},
 };
 use axum::{
     Router,
@@ -26,17 +27,20 @@ pub struct AppState {
     pub core: Arc<Core>,
     pub runtime: Arc<Runtime>,
     pub db: Arc<Db>,
+    pub internal_db: Arc<InternalDb>,
 }
 
 #[tokio::main]
 pub async fn run() -> Result<(), Box<dyn Error>> {
     let core = kv::core::Core::new().unwrap();
     let runtime: Arc<Runtime> = js::runtime::Runtime::new(Arc::clone(&core));
-    let db = Arc::new(sql::core::Db::new(STORE_PATH).unwrap());
+    let db = Arc::new(sql::db::Db::new(USER_STORE_PATH).unwrap());
+    let internal_db = Arc::new(internal::db::InternalDb::new().unwrap());
     let state = AppState {
         core: Arc::clone(&core),
         runtime,
         db,
+        internal_db,
     };
 
     let app = Router::new()

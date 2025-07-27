@@ -1,10 +1,12 @@
 use std::sync::Mutex;
 
-use deno_core::serde_json::{self, Map, Value};
+use deno_core::serde_json::{self, Map, Value, to_value};
 use rusqlite::{Connection, Result, Row};
 
+use crate::sql::dbmodel::DbModel;
+
 pub struct Db {
-    conn: Mutex<Connection>,
+    pub conn: Mutex<Connection>,
 }
 
 impl Db {

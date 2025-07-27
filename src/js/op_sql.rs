@@ -12,13 +12,13 @@ pub fn op_sql_query(
     state: &mut OpState,
     #[string] query: String,
 ) -> Result<serde_json::Value, AnyError> {
-    let db: &sql::core::Db = state.borrow::<sql::core::Db>();
+    let db: &sql::db::Db = state.borrow::<sql::db::Db>();
     let value = db.query_json(&query).unwrap();
     Ok(value)
 }
 #[op2(fast)]
 pub fn op_sql_exec(state: &mut OpState, #[string] statement: String) -> Result<(), AnyError> {
-    let db: &sql::core::Db = state.borrow::<sql::core::Db>();
+    let db: &sql::db::Db = state.borrow::<sql::db::Db>();
     db.execute_batch(&statement)?;
     Ok(())
 }

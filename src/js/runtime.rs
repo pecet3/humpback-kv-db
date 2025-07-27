@@ -11,7 +11,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::sync::Mutex;
 
-use crate::STORE_PATH;
+use crate::USER_STORE_PATH;
 use crate::js::event::Event;
 use crate::js::op_event;
 use crate::js::op_http;
@@ -113,14 +113,14 @@ fn spawn_js_runtime(
                     ..Default::default()
                 });
 
-                let db = sql::core::Db::new(STORE_PATH).unwrap();
+                let db = sql::db::Db::new(USER_STORE_PATH).unwrap();
                 {
                     let op_state = js_runtime.op_state();
                     let mut op_state = op_state.borrow_mut();
                     op_state.put::<Arc<Core>>(Arc::clone(&core));
                     op_state.put::<Events>(Arc::clone(&events));
                     op_state.put::<Results>(Arc::clone(&results));
-                    op_state.put::<sql::core::Db>(db);
+                    op_state.put::<sql::db::Db>(db);
                 }
 
                 let mod_id = js_runtime.load_main_es_module(&main_module).await.unwrap();
