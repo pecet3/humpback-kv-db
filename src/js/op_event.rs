@@ -19,7 +19,7 @@ pub fn op_event_next(state: &mut OpState) -> Result<Option<Event>, AnyError> {
 pub fn op_event_return(state: &mut OpState, id: i32, #[serde] event_result: serde_json::Value) {
     let results = state.borrow::<Results>();
     let mut results_mut = results.lock().unwrap();
-    println!("result {:?}", event_result);
+    println!("event id: {:?} result {:?}", id, event_result);
     if let Some(sender) = results_mut.remove(&id) {
         let result = sender.send(json!(event_result));
         if result.is_err() {
