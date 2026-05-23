@@ -12,3 +12,4 @@ export interface ApiResponse {
   error?: string;
   output?: string;
 }
+

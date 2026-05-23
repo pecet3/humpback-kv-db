@@ -209,10 +209,12 @@ const App: React.FC = () => {
     type: "success" | "error";
   } | null>(null);
   const [isFloatingOpen, setIsFloatingOpen] = useState(false);
-
+  const [showItem,setShowItem]=useState<KVItem | null>(null);
   const showNotification = (message: string, type: "success" | "error") => {
     setNotification({ message, type });
   };
+  
+
   const [results, setResults] = useState<string[]>([]);
 
   const loadItems = async () => {
@@ -294,7 +296,7 @@ const App: React.FC = () => {
           typeof result.data === "object"
             ? JSON.stringify(result.data, null, 2)
             : result.data;
-        alert(`Key: ${key}\nData: ${data}`);
+        setShowItem({ key, kind: "string", size: 0, data });
       } else {
         showNotification(result.error || "Failed to get item", "error");
       }
@@ -364,6 +366,7 @@ const App: React.FC = () => {
             onView={handleViewItem}
             onExecute={handleExecuteScript}
             isLoading={isLoading}
+            showItem={showItem}
           />
         )}
 

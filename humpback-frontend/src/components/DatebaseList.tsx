@@ -9,6 +9,7 @@ export const DatabaseList: React.FC<{
   onView: (key: string) => void;
   onExecute: (key: string) => void;
   isLoading: boolean;
+  showItem: KVItem | null;
 }> = ({
   items,
   searchQuery,
@@ -17,6 +18,7 @@ export const DatabaseList: React.FC<{
   onView,
   onExecute,
   isLoading,
+  showItem,
 }) => {
   const filteredItems = items.filter((item) =>
     item.key.toLowerCase().includes(searchQuery.toLowerCase())
@@ -24,6 +26,14 @@ export const DatabaseList: React.FC<{
 
   return (
     <div className="bg-white rounded-lg shadow-lg p-6">
+      {showItem && (
+        <div className="mb-4 p-4 bg-gray-100 rounded">
+          <h3 className="text-lg font-semibold mb-2">{showItem.key}</h3>
+          <pre className="text-sm text-gray-700 whitespace-pre-wrap">
+            {showItem?.data}
+          </pre>
+        </div>
+      )}
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-semibold">Database Items</h2>
         <button
