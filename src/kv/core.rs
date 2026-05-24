@@ -159,7 +159,7 @@ impl Core {
 
         self.objects.set(Object { desc, data }).unwrap();
     }
-    pub async fn delete_soft(&self, key: &str) -> Result<(), Box<dyn Error + Send + Sync>> {
+    pub async fn delete_soft_async(&self, key: &str) -> Result<(), Box<dyn Error + Send + Sync>> {
         let mut object = self
             .objects
             .delete(key.to_string())

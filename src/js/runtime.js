@@ -36,6 +36,10 @@ globalThis.kv = {
     return value;
   },
 
+  delete: (key) => {
+    return core.ops.op_kv_delete(key);
+  },
+
   set: (key, data) => {
     const type = typeof data;
     core.print(type);

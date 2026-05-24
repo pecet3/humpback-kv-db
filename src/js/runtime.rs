@@ -23,6 +23,7 @@ extension!(
     op_kv::op_kv_set_string,
     op_kv::op_kv_set_number,
     op_kv::op_kv_set_object,
+    op_kv::op_kv_delete,
     op_http::op_http_get,
     // op_http::op_http_post,
     // op_http::op_http_delete,
@@ -72,11 +73,9 @@ fn spawn_js_runtime(core: Arc<Core>, events: Events, results: Results) {
 
         loop {
             let res: Result<(), ()> = rt.block_on(async {
-                let main_module = deno_core::resolve_path(
-                    "./humpback-data/scripts/eventLoop.js",
-                    &std::env::current_dir().unwrap(),
-                )
-                .unwrap();
+                let main_module =
+                    deno_core::resolve_path("./eventLoop.js", &std::env::current_dir().unwrap())
+                        .unwrap();
 
                 let mut js_runtime = deno_core::JsRuntime::new(deno_core::RuntimeOptions {
                     module_loader: Some(Rc::new(deno_core::FsModuleLoader)),

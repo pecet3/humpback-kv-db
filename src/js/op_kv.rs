@@ -87,6 +87,14 @@ pub fn op_kv_set_string(
 }
 
 #[op2(fast)]
+pub fn op_kv_delete(state: &mut OpState, #[string] key: String) -> Result<(), AnyError> {
+    let core = state.borrow::<Arc<kv::core::Core>>().clone();
+    // TO DO
+    // core.delete_soft_async(&key).await;
+    Ok(())
+}
+
+#[op2(fast)]
 pub fn op_kv_set_number(
     state: &mut OpState,
     #[string] key: String,

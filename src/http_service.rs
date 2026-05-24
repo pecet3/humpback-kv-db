@@ -280,7 +280,7 @@ async fn handle_delete(
     }
 
     let start = std::time::Instant::now();
-    match state.core.delete_soft(&request.key).await {
+    match state.core.delete_soft_async(&request.key).await {
         Ok(_) => {
             let duration = start.elapsed();
             println!("DELETE completed in {:.2?}", duration);
